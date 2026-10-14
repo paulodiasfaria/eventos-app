@@ -279,6 +279,29 @@ def api_add_events():
     return jsonify({"inserted": inserted, "received": len(items)})
 
 
+@app.route("/api/preferences", methods=["POST"])
+def api_set_preferences():
+    """Permite seedar/ajustar pesos de preferencia manualmente. Body: [{"tag":"rock","weight":2}, ...]"""
+    unauthorized = require_api_key()
+    if unauthorized:
+        return unauthorized
+    db = get_db()
+    payload = request.get_json(force=True)
+    items = payload if isinstance(payload, list) else [payload]
+    for item in items:
+        tag = (item.get("tag") or "").strip().lower()
+        weight = float(item.get("weight", 0))
+        if not tag:
+            continue
+        row = db.execute("SELECT id FROM preferences WHERE tag = ?", (tag,)).fetchone()
+        if row:
+            db.execute("UPDATE preferences SET weight = ? WHERE tag = ?", (weight, tag))
+        else:
+            db.execute("INSERT INTO preferences (tag, weight) VALUES (?, ?)", (tag, weight))
+    db.commit()
+    return jsonify({"updated": len(items)})
+
+
 @app.route("/api/rules/status")
 def api_rules_status():
     unauthorized = require_api_key()
