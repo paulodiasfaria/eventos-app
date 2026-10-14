@@ -9,18 +9,106 @@ Arquitetura:
   de preferencia por tag (aprendizagem simples).
 - Motor de regras verifica se cumpres as regras definidas (ex: 1 concerto/mes).
 - API /api/rules/status e /api/recommendations/top para um cron de WhatsApp consultar.
+- Scoring considera tags aprendidas, distancia a Lisboa (mais perto = melhor),
+  preco (gratis = melhor) e horario (noite = pior, por causa da Lara, 3 anos).
+- Eventos que ja ocorreram sao filtrados automaticamente. Eventos marcados para
+  o proprio dia de hoje só interessam se forem em Lisboa ou a <=50km.
 """
 import json
 import os
+import re
 import sqlite3
+import unicodedata
 from datetime import date, datetime, timedelta
 
 from flask import Flask, g, jsonify, redirect, render_template, request, url_for
 
 DB_PATH = os.environ.get("EVENTOS_DB_PATH", os.path.join(os.path.dirname(__file__), "eventos.db"))
 API_KEY = os.environ.get("EVENTOS_API_KEY", "changeme-dev-key")
+TODAY_RADIUS_KM = 50  # eventos no dia de hoje só interessam dentro deste raio (ou em Lisboa)
 
 app = Flask(__name__)
+
+# Distancias aproximadas (km por estrada) de cidades/concelhos comuns a Lisboa.
+# Usado como fallback quando o cron nao fornece distance_km explicitamente.
+CITY_DISTANCE_KM = {
+    "lisboa": 0, "lisbon": 0,
+    "amadora": 10, "odivelas": 12, "oeiras": 15, "cascais": 30, "sintra": 28,
+    "almada": 10, "seixal": 15, "barreiro": 20, "montijo": 20, "alcochete": 25,
+    "loures": 15, "vila franca de xira": 32, "mafra": 40, "setubal": 48,
+    "ericeira": 45, "azambuja": 50,
+    "obidos": 85, "peniche": 95, "nazare": 123, "tomar": 145, "fatima": 123,
+    "evora": 130, "alcacer do sal": 90, "santarem": 80, "caldas da rainha": 95,
+    "leiria": 140, "coimbra": 200, "figueira da foz": 180,
+    "porto": 314, "braga": 365, "guimaraes": 345, "aveiro": 250, "viseu": 290,
+    "faro": 278, "lagos": 290, "albufeira": 255, "portimao": 285,
+    "covilha": 300, "castelo branco": 255, "beja": 175, "elvas": 215,
+}
+
+
+def normalize_city(city):
+    if not city:
+        return ""
+    text = unicodedata.normalize("NFKD", city).encode("ascii", "ignore").decode("ascii")
+    return text.strip().lower()
+
+
+def resolve_distance_km(city, explicit_distance_km):
+    if explicit_distance_km is not None:
+        try:
+            return float(explicit_distance_km)
+        except (TypeError, ValueError):
+            pass
+    return CITY_DISTANCE_KM.get(normalize_city(city))
+
+
+def is_within_today_radius(city, distance_km):
+    """Verdade se o evento for em Lisboa ou dentro do raio TODAY_RADIUS_KM."""
+    norm = normalize_city(city)
+    if norm in ("lisboa", "lisbon"):
+        return True
+    d = resolve_distance_km(city, distance_km)
+    if d is None:
+        return False  # sem informação de distância, não arriscamos para o dia de hoje
+    return d <= TODAY_RADIUS_KM
+
+
+PRICE_FREE_PATTERN = re.compile(
+    r"\bgratis\b|\bgratuito\b|\bfree\b|entrada livre|sem custo|^\s*0\s*(e|eur|euros?)?\s*$",
+)
+
+
+def guess_is_free(price_text, is_free_flag):
+    if is_free_flag is not None:
+        return bool(is_free_flag)
+    if not price_text:
+        return None
+    norm = normalize_city(str(price_text))
+    return bool(PRICE_FREE_PATTERN.search(norm))
+
+
+def parse_price_value(price_text):
+    if not price_text:
+        return None
+    match = re.search(r"(\d+(?:[.,]\d+)?)", str(price_text))
+    if not match:
+        return None
+    try:
+        return float(match.group(1).replace(",", "."))
+    except ValueError:
+        return None
+
+
+def parse_event_hour(event_time):
+    if not event_time:
+        return None
+    match = re.match(r"^(\d{1,2})", str(event_time).strip())
+    if not match:
+        return None
+    hour = int(match.group(1))
+    if 0 <= hour <= 23:
+        return hour
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -42,11 +130,31 @@ def close_db(_exc):
         db.close()
 
 
+# Colunas novas que podem faltar numa BD criada antes desta versão.
+EXTRA_EVENT_COLUMNS = {
+    "event_date": "TEXT",       # data principal do evento (YYYY-MM-DD), usada para filtrar passado
+    "event_date_end": "TEXT",   # fim do periodo, para exposicoes/eventos com duracao
+    "event_time": "TEXT",       # hora HH:MM, opcional
+    "distance_km": "REAL",      # distancia a Lisboa, se conhecida/fornecida
+    "is_free": "INTEGER",       # 1 = gratuito, 0 = pago, NULL = desconhecido
+    "image_url": "TEXT",        # foto ilustrativa do evento
+}
+
+
+def migrate_schema(conn):
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(events)").fetchall()}
+    for col, col_type in EXTRA_EVENT_COLUMNS.items():
+        if col not in cols:
+            conn.execute(f"ALTER TABLE events ADD COLUMN {col} {col_type}")
+    conn.commit()
+
+
 def init_db():
     schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
     conn = sqlite3.connect(DB_PATH)
     with open(schema_path, "r", encoding="utf-8") as f:
         conn.executescript(f.read())
+    migrate_schema(conn)
     # seed default rules if table is empty
     cur = conn.execute("SELECT COUNT(*) FROM rules")
     if cur.fetchone()[0] == 0:
@@ -86,20 +194,80 @@ def adjust_weights(db, tags, delta):
     db.commit()
 
 
-def score_event(db, tags_json):
+def distance_score(distance_km):
+    """Mais perto de Lisboa = melhor. 0km -> +5, 150km -> 0, mais longe -> 0 (sem penalizar viagens)."""
+    if distance_km is None:
+        return 0.0
+    return max(0.0, 5.0 - (distance_km / 30.0))
+
+
+def price_score(price_text, is_free_flag):
+    free = guess_is_free(price_text, is_free_flag)
+    if free is True:
+        return 3.0
+    value = parse_price_value(price_text)
+    if value is None:
+        return 0.0
+    if value <= 10:
+        return 1.0
+    if value <= 25:
+        return 0.0
+    return -1.0
+
+
+def time_score(event_time):
+    """Horario pior à noite (Lara, 3 anos): manhã é melhor, noite/madrugada penalizado."""
+    hour = parse_event_hour(event_time)
+    if hour is None:
+        return 0.0
+    if 6 <= hour < 12:
+        return 2.0
+    if 12 <= hour < 18:
+        return 1.0
+    if 18 <= hour < 21:
+        return -2.0
+    return -4.0  # noite tardia / madrugada
+
+
+def score_event(db, event_row):
     try:
-        tags = json.loads(tags_json) if tags_json else []
+        tags = json.loads(event_row["tags"]) if event_row["tags"] else []
     except (ValueError, TypeError):
         tags = []
-    return sum(get_weight(db, t.strip().lower()) for t in tags)
+    tag_score = sum(get_weight(db, t.strip().lower()) for t in tags)
+    dist = resolve_distance_km(event_row["city"], event_row["distance_km"])
+    return (
+        tag_score
+        + distance_score(dist)
+        + price_score(event_row["price"], event_row["is_free"])
+        + time_score(event_row["event_time"])
+    )
 
 
 def recompute_scores(db):
-    rows = db.execute("SELECT id, tags FROM events WHERE status = 'pending'").fetchall()
+    rows = db.execute("SELECT * FROM events WHERE status = 'pending'").fetchall()
     for r in rows:
-        s = score_event(db, r["tags"])
+        s = score_event(db, r)
         db.execute("UPDATE events SET score = ? WHERE id = ?", (s, r["id"]))
     db.commit()
+
+
+def relevant_pending_query_rows(db):
+    """Eventos pendentes, excluindo os que já passaram ou que hoje ficam fora do raio."""
+    today_iso = date.today().isoformat()
+    rows = db.execute(
+        "SELECT * FROM events WHERE status = 'pending' "
+        "AND (event_date IS NULL OR event_date_end >= ? OR (event_date_end IS NULL AND event_date >= ?)) "
+        "ORDER BY score DESC, created_at DESC",
+        (today_iso, today_iso),
+    ).fetchall()
+    filtered = []
+    for r in rows:
+        if r["event_date"] == today_iso:
+            if not is_within_today_radius(r["city"], r["distance_km"]):
+                continue
+        filtered.append(r)
+    return filtered
 
 
 # ---------------------------------------------------------------------------
@@ -160,9 +328,7 @@ def all_rule_statuses(db):
 def dashboard():
     db = get_db()
     recompute_scores(db)
-    pending = db.execute(
-        "SELECT * FROM events WHERE status = 'pending' ORDER BY score DESC, created_at DESC"
-    ).fetchall()
+    pending = relevant_pending_query_rows(db)
     upcoming = db.execute(
         "SELECT * FROM events WHERE status = 'accepted' AND chosen_date >= ? ORDER BY chosen_date ASC",
         (date.today().isoformat(),),
@@ -210,15 +376,24 @@ def reject_event(event_id):
 def add_manual_event():
     db = get_db()
     tags = [t.strip() for t in request.form.get("tags", "").split(",") if t.strip()]
+    is_free_raw = request.form.get("is_free")
+    is_free = 1 if is_free_raw == "on" else None
     db.execute(
-        "INSERT INTO events (title, category, city, country, venue, tags, source_url, price, "
-        "notes, status, created_at) VALUES (?,?,?,?,?,?,?,?,?, 'pending', ?)",
+        "INSERT INTO events (title, category, city, country, venue, event_date, event_date_end, "
+        "event_time, distance_km, is_free, image_url, tags, source_url, price, notes, status, created_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'pending', ?)",
         (
             request.form.get("title"),
             request.form.get("category"),
             request.form.get("city"),
             request.form.get("country"),
             request.form.get("venue"),
+            request.form.get("event_date") or None,
+            request.form.get("event_date_end") or None,
+            request.form.get("event_time") or None,
+            request.form.get("distance_km") or None,
+            is_free,
+            request.form.get("image_url") or None,
             json.dumps(tags),
             request.form.get("source_url"),
             request.form.get("price"),
@@ -241,6 +416,27 @@ def require_api_key():
     return None
 
 
+def should_skip_event(item):
+    """Decide se um evento candidato deve ser ignorado: já passou, ou é hoje mas longe."""
+    today_iso = date.today().isoformat()
+    event_date = item.get("event_date")
+    event_date_end = item.get("event_date_end")
+
+    if not event_date and item.get("date_options"):
+        opts = item.get("date_options") or []
+        if opts:
+            event_date = sorted(opts)[0]
+
+    if event_date:
+        relevant_end = event_date_end or event_date
+        if relevant_end < today_iso:
+            return True, "evento já passou"
+        if event_date == today_iso:
+            if not is_within_today_radius(item.get("city"), item.get("distance_km")):
+                return True, "evento é hoje e está fora do raio de 50km / não é em Lisboa"
+    return False, None
+
+
 @app.route("/api/events", methods=["POST"])
 def api_add_events():
     unauthorized = require_api_key()
@@ -250,16 +446,30 @@ def api_add_events():
     payload = request.get_json(force=True)
     items = payload if isinstance(payload, list) else [payload]
     inserted = 0
+    skipped = []
     for item in items:
-        # evita duplicados óbvios pelo título+data+cidade
+        skip, reason = should_skip_event(item)
+        if skip:
+            skipped.append({"title": item.get("title"), "reason": reason})
+            continue
+        # evita duplicados óbvios pelo título+cidade
         existing = db.execute(
             "SELECT id FROM events WHERE title = ? AND city = ?", (item.get("title"), item.get("city"))
         ).fetchone()
         if existing:
             continue
+
+        event_date = item.get("event_date")
+        if not event_date and item.get("date_options"):
+            opts = item.get("date_options") or []
+            if opts:
+                event_date = sorted(opts)[0]
+
+        is_free_flag = item.get("is_free")
         db.execute(
-            "INSERT INTO events (title, category, city, country, venue, date_options, tags, "
-            "source_url, price, notes, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,?, 'pending', ?)",
+            "INSERT INTO events (title, category, city, country, venue, date_options, event_date, "
+            "event_date_end, event_time, distance_km, is_free, image_url, tags, source_url, price, "
+            "notes, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending', ?)",
             (
                 item.get("title"),
                 item.get("category"),
@@ -267,6 +477,12 @@ def api_add_events():
                 item.get("country"),
                 item.get("venue"),
                 json.dumps(item.get("date_options", [])),
+                event_date,
+                item.get("event_date_end"),
+                item.get("event_time"),
+                item.get("distance_km"),
+                (1 if is_free_flag else (0 if is_free_flag is False else None)),
+                item.get("image_url"),
                 json.dumps(item.get("tags", [])),
                 item.get("source_url"),
                 item.get("price"),
@@ -276,7 +492,7 @@ def api_add_events():
         )
         inserted += 1
     db.commit()
-    return jsonify({"inserted": inserted, "received": len(items)})
+    return jsonify({"inserted": inserted, "received": len(items), "skipped": skipped})
 
 
 @app.route("/api/preferences", methods=["POST"])
@@ -319,12 +535,10 @@ def api_top_recommendations():
     db = get_db()
     recompute_scores(db)
     limit = int(request.args.get("limit", 3))
-    rows = db.execute(
-        "SELECT title, category, city, score, tags, source_url FROM events "
-        "WHERE status='pending' ORDER BY score DESC LIMIT ?",
-        (limit,),
-    ).fetchall()
-    return jsonify([dict(r) for r in rows])
+    rows = relevant_pending_query_rows(db)[:limit]
+    cols = ["title", "category", "city", "score", "tags", "source_url", "event_date",
+            "event_time", "distance_km", "is_free", "price", "image_url"]
+    return jsonify([{c: r[c] for c in cols} for r in rows])
 
 
 @app.route("/healthz")
@@ -333,11 +547,7 @@ def healthz():
 
 
 if __name__ == "__main__":
-    if not os.path.exists(DB_PATH):
-        init_db()
-    else:
-        # garante que tabelas novas/regras default existem mesmo com DB já criado
-        init_db()
+    init_db()
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 else:
     # quando corrido via gunicorn/WSGI em produção

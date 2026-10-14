@@ -20,24 +20,38 @@
 
 <section class="recommendations">
   <h2>✨ Recomendações (por aceitar)</h2>
+  <p class="hint">Eventos já passados ou marcados para hoje fora de Lisboa/50km são filtrados automaticamente.</p>
   {% if not pending %}
     <p class="empty">Sem eventos pendentes. Adiciona manualmente ou espera pelo próximo fetch.</p>
   {% endif %}
   <div class="event-grid">
     {% for e in pending %}
     <div class="event-card">
+      {% if e.image_url %}
+      <img class="event-image" src="{{ e.image_url }}" alt="{{ e.title }}" loading="lazy"
+           onerror="this.style.display='none'">
+      {% endif %}
       <div class="event-head">
         <span class="badge badge-{{ e.category }}">{{ e.category }}</span>
         <span class="score">score {{ "%.1f"|format(e.score) }}</span>
       </div>
       <h3>{{ e.title }}</h3>
-      <p>{{ e.city }}{% if e.country %}, {{ e.country }}{% endif %} {% if e.venue %}· {{ e.venue }}{% endif %}</p>
+      <p>
+        {{ e.city }}{% if e.country %}, {{ e.country }}{% endif %} {% if e.venue %}· {{ e.venue }}{% endif %}
+        {% if e.distance_km is not none %}· 📍 {{ e.distance_km|round(0)|int }} km{% endif %}
+      </p>
+      <p class="when">
+        {% if e.event_date %}📅 {{ e.event_date }}{% if e.event_date_end and e.event_date_end != e.event_date %} a {{ e.event_date_end }}{% endif %}{% endif %}
+        {% if e.event_time %} · 🕒 {{ e.event_time }}{% endif %}
+      </p>
       <p class="tags">{{ e.tags }}</p>
-      {% if e.price %}<p class="price">💶 {{ e.price }}</p>{% endif %}
+      <p class="price">
+        {% if e.is_free %}🟢 Grátis{% elif e.price %}💶 {{ e.price }}{% endif %}
+      </p>
       {% if e.source_url %}<p><a href="{{ e.source_url }}" target="_blank">ver fonte</a></p>{% endif %}
 
       <form method="post" action="{{ url_for('accept_event', event_id=e.id) }}" class="accept-form">
-        <input type="date" name="chosen_date" value="{{ e.chosen_date or today }}">
+        <input type="date" name="chosen_date" value="{{ e.event_date or e.chosen_date or today }}">
         <button type="submit" class="btn-accept">Aceitar</button>
       </form>
       <form method="post" action="{{ url_for('reject_event', event_id=e.id) }}">
@@ -73,8 +87,14 @@
     <input type="text" name="city" placeholder="Cidade">
     <input type="text" name="country" placeholder="País">
     <input type="text" name="venue" placeholder="Local/Venue">
+    <input type="date" name="event_date" placeholder="Data do evento">
+    <input type="date" name="event_date_end" placeholder="Data fim (opcional)">
+    <input type="time" name="event_time" placeholder="Hora">
+    <input type="number" step="0.1" name="distance_km" placeholder="Distância a Lisboa (km)">
+    <label class="checkbox-label"><input type="checkbox" name="is_free"> Grátis</label>
     <input type="text" name="tags" placeholder="tags separadas por vírgula">
     <input type="text" name="price" placeholder="Preço">
+    <input type="url" name="image_url" placeholder="Link da foto">
     <input type="url" name="source_url" placeholder="Link">
     <input type="text" name="notes" placeholder="Notas">
     <button type="submit">Adicionar</button>
