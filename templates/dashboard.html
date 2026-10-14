@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="rules">
+  <h2>📋 Regras</h2>
+  <div class="rule-grid">
+    {% for r in rules_status %}
+    <div class="rule-card status-{{ r.status }}">
+      <strong>{{ r.rule }}</strong>
+      <p>{{ r.description }}</p>
+      <small>
+        Status: <b>{{ {'ok':'✅ OK','at_risk':'⚠️ em risco','overdue':'❌ em falta'}[r.status] }}</b><br>
+        Última cumprida: {{ r.last_fulfilled or '—' }}<br>
+        Próxima data limite: {{ r.next_due }}
+      </small>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="recommendations">
+  <h2>✨ Recomendações (por aceitar)</h2>
+  {% if not pending %}
+    <p class="empty">Sem eventos pendentes. Adiciona manualmente ou espera pelo próximo fetch.</p>
+  {% endif %}
+  <div class="event-grid">
+    {% for e in pending %}
+    <div class="event-card">
+      <div class="event-head">
+        <span class="badge badge-{{ e.category }}">{{ e.category }}</span>
+        <span class="score">score {{ "%.1f"|format(e.score) }}</span>
+      </div>
+      <h3>{{ e.title }}</h3>
+      <p>{{ e.city }}{% if e.country %}, {{ e.country }}{% endif %} {% if e.venue %}· {{ e.venue }}{% endif %}</p>
+      <p class="tags">{{ e.tags }}</p>
+      {% if e.price %}<p class="price">💶 {{ e.price }}</p>{% endif %}
+      {% if e.source_url %}<p><a href="{{ e.source_url }}" target="_blank">ver fonte</a></p>{% endif %}
+
+      <form method="post" action="{{ url_for('accept_event', event_id=e.id) }}" class="accept-form">
+        <input type="date" name="chosen_date" value="{{ e.chosen_date or today }}">
+        <button type="submit" class="btn-accept">Aceitar</button>
+      </form>
+      <form method="post" action="{{ url_for('reject_event', event_id=e.id) }}">
+        <button type="submit" class="btn-reject">Rejeitar</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="upcoming">
+  <h2>📅 Próximos eventos aceites</h2>
+  {% if not upcoming %}
+    <p class="empty">Nada agendado ainda.</p>
+  {% endif %}
+  <ul class="upcoming-list">
+    {% for e in upcoming %}
+    <li><b>{{ e.chosen_date }}</b> — {{ e.title }} ({{ e.category }}, {{ e.city }})</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="manual-add">
+  <h2>➕ Adicionar evento manualmente</h2>
+  <form method="post" action="{{ url_for('add_manual_event') }}" class="manual-form">
+    <input type="text" name="title" placeholder="Título" required>
+    <select name="category">
+      <option value="concert">concerto</option>
+      <option value="cultural">cultural</option>
+      <option value="trip">viagem</option>
+      <option value="other">outro</option>
+    </select>
+    <input type="text" name="city" placeholder="Cidade">
+    <input type="text" name="country" placeholder="País">
+    <input type="text" name="venue" placeholder="Local/Venue">
+    <input type="text" name="tags" placeholder="tags separadas por vírgula">
+    <input type="text" name="price" placeholder="Preço">
+    <input type="url" name="source_url" placeholder="Link">
+    <input type="text" name="notes" placeholder="Notas">
+    <button type="submit">Adicionar</button>
+  </form>
+</section>
+
+{% endblock %}

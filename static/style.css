@@ -1,0 +1,69 @@
+:root {
+  --bg: #0f1221;
+  --card: #1b1f36;
+  --text: #eef0fb;
+  --muted: #9aa0c3;
+  --accent: #6c7bff;
+  --ok: #3ddc97;
+  --risk: #ffb020;
+  --overdue: #ff5d5d;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+header {
+  padding: 24px 32px 8px;
+}
+header h1 { margin: 0; }
+.subtitle { color: var(--muted); margin: 4px 0 0; }
+main { padding: 16px 32px 64px; max-width: 1100px; margin: 0 auto; }
+h2 { margin-top: 36px; }
+.empty { color: var(--muted); }
+
+.rule-grid, .event-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.rule-card, .event-card {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 14px 16px;
+  border: 1px solid #2a2f4d;
+}
+.rule-card.status-ok { border-left: 4px solid var(--ok); }
+.rule-card.status-at_risk { border-left: 4px solid var(--risk); }
+.rule-card.status-overdue { border-left: 4px solid var(--overdue); }
+.rule-card small { color: var(--muted); line-height: 1.5; }
+
+.event-head { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.badge { background: var(--accent); color: white; padding: 2px 8px; border-radius: 20px; font-size: 11px; text-transform: uppercase; }
+.event-card h3 { margin: 8px 0 4px; }
+.event-card p { margin: 4px 0; font-size: 14px; color: var(--muted); }
+.event-card a { color: var(--accent); }
+.tags { font-style: italic; }
+
+.accept-form { display: flex; gap: 6px; margin-top: 10px; }
+input, select, button {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #333a5c;
+  background: #11142a;
+  color: var(--text);
+}
+button { cursor: pointer; }
+.btn-accept { background: var(--ok); color: #0a1a12; border: none; font-weight: 600; }
+.btn-reject { background: transparent; color: var(--overdue); border: 1px solid var(--overdue); margin-top: 6px; width: 100%; }
+
+.upcoming-list { list-style: none; padding: 0; }
+.upcoming-list li { background: var(--card); margin-bottom: 8px; padding: 10px 14px; border-radius: 8px; }
+
+.manual-form { display: flex; flex-wrap: wrap; gap: 8px; }
+.manual-form input, .manual-form select { flex: 1 1 150px; }
+.manual-form button { flex: 1 1 100%; background: var(--accent); color: white; border: none; font-weight: 600; padding: 10px; }

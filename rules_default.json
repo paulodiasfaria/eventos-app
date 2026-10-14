@@ -1,0 +1,29 @@
+[
+  {
+    "name": "Viagem fora de Lisboa quinzenal",
+    "description": "Pelo menos 1 viagem fora de Lisboa a cada 14 dias (fim de semana).",
+    "category": "trip",
+    "period_days": 14,
+    "min_count": 1,
+    "window_type": "rolling",
+    "weekend_only": true
+  },
+  {
+    "name": "Concerto mensal",
+    "description": "Pelo menos 1 concerto por mes.",
+    "category": "concert",
+    "period_days": 30,
+    "min_count": 1,
+    "window_type": "rolling",
+    "weekend_only": false
+  },
+  {
+    "name": "Visita cultural mensal",
+    "description": "Pelo menos 1 visita cultural (museu, exposicao, patrimonio) por mes.",
+    "category": "cultural",
+    "period_days": 30,
+    "min_count": 1,
+    "window_type": "rolling",
+    "weekend_only": false
+  }
+]
