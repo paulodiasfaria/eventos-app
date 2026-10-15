@@ -27,10 +27,11 @@
   <div class="event-grid">
     {% for e in pending %}
     <div class="event-card">
-      {% if e.image_url %}
-      <img class="event-image" src="{{ e.image_url }}" alt="{{ e.title }}" loading="lazy"
-           onerror="this.style.display='none'">
-      {% endif %}
+      <img class="event-image"
+           src="{{ e.image_url or url_for('static', filename='img/' + (e.category if e.category in ['concert','cultural','trip'] else 'other') + '.svg') }}"
+           alt="{{ e.title }}" loading="lazy"
+           onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/other.svg') }}'">
+
       <div class="event-head">
         <span class="badge badge-{{ e.category }}">{{ e.category }}</span>
         <span class="score">score {{ "%.1f"|format(e.score) }}</span>
