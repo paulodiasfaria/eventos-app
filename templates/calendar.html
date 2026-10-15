@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="calendar-page">
+  <h2>📅 Calendário (3 meses)</h2>
+  <p class="hint">
+    <span class="legend-dot legend-accepted"></span> dias com eventos aceites ·
+    <span class="legend-dot legend-pending"></span> dias com propostas pendentes ·
+    clica num dia para ver detalhes.
+  </p>
+
+  <div class="calendar-months">
+    {% for grid in month_grids %}
+    <div class="cal-month">
+      <h3>{{ grid.label }}</h3>
+      <div class="cal-weekdays">
+        {% for wd in weekday_names %}<span>{{ wd }}</span>{% endfor %}
+      </div>
+      <div class="cal-grid">
+        {% for week in grid.weeks %}
+          {% for cell in week %}
+            {% if cell is none %}
+              <div class="cal-day cal-empty"></div>
+            {% else %}
+              <div class="cal-day
+                          {% if cell.date == today %} cal-today{% endif %}
+                          {% if cell.has_accepted %} cal-accepted{% endif %}
+                          {% if cell.has_pending %} cal-pending{% endif %}"
+                   {% if cell.events %}onclick="openDayModal('{{ cell.date }}')" title="{{ cell.events|map(attribute='title')|join(', ') }}"{% endif %}>
+                <span class="cal-day-num">{{ cell.day }}</span>
+              </div>
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<div id="day-modal" class="modal-overlay" onclick="closeModalOutside(event)">
+  <div class="modal-content" id="modal-content"></div>
+</div>
+
+<script>
+const EVENTS_BY_DATE = {{ events_by_date_json | safe }};
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : str;
+  return div.innerHTML;
+}
+
+function openDayModal(dateStr) {
+  const events = EVENTS_BY_DATE[dateStr] || [];
+  if (!events.length) return;
+  const content = document.getElementById('modal-content');
+  const header = `<div class="modal-header"><h3>${escapeHtml(dateStr)}</h3><button onclick="closeModal()" class="modal-close">✕</button></div>`;
+  const body = events.map(e => `
+    <div class="modal-event">
+      <img src="${escapeHtml(e.image_url)}" class="modal-event-image" onerror="this.style.display='none'">
+      <div class="modal-event-info">
+        <span class="status-pill">${escapeHtml(e.status_label)}</span>
+        <h4>${escapeHtml(e.title)}</h4>
+        <p>${escapeHtml(e.city || '')}${e.venue ? ' · ' + escapeHtml(e.venue) : ''}${(e.distance_km !== null && e.distance_km !== undefined) ? ' · 📍 ' + Math.round(e.distance_km) + ' km' : ''}</p>
+        <p>${e.event_time ? '🕒 ' + escapeHtml(e.event_time) : ''}</p>
+        <p>${e.is_free ? '🟢 Grátis' : (e.price ? '💶 ' + escapeHtml(e.price) : '')}</p>
+        ${e.source_url ? `<p><a href="${escapeHtml(e.source_url)}" target="_blank">ver fonte</a></p>` : ''}
+      </div>
+    </div>`).join('');
+  content.innerHTML = header + body;
+  document.getElementById('day-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('day-modal').classList.remove('open');
+}
+
+function closeModalOutside(ev) {
+  if (ev.target.id === 'day-modal') closeModal();
+}
+</script>
+
+{% endblock %}

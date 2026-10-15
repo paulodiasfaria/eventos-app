@@ -287,6 +287,7 @@ def filter_past_and_today_radius(rows):
 
 
 STATUS_LABELS = {
+    "all": "Todos",
     "pending": "Proposto",
     "accepted": "Aceite",
     "rejected": "Rejeitado",
@@ -297,8 +298,11 @@ STATUS_LABELS = {
 def build_filtered_events(db, status, category=None, date_from=None, date_to=None,
                            max_price=None, max_distance=None, free_only=False):
     """Lista eventos filtrados por estado + categoria/datas/preço/distância."""
-    query = "SELECT * FROM events WHERE status = ?"
-    params = [status]
+    query = "SELECT * FROM events WHERE 1=1"
+    params = []
+    if status and status != "all":
+        query += " AND status = ?"
+        params.append(status)
     if category:
         query += " AND category = ?"
         params.append(category)
@@ -316,6 +320,11 @@ def build_filtered_events(db, status, category=None, date_from=None, date_to=Non
 
     if status == "pending":
         rows = filter_past_and_today_radius(rows)
+    elif status == "all":
+        # dentro de "Todos", só aplicamos o filtro de passado/raio aos propostos;
+        # aceites/rejeitados/adiados mostram-se sempre (são histórico/decisão já tomada).
+        rows = [r for r in rows if r["status"] != "pending"] + \
+               filter_past_and_today_radius([r for r in rows if r["status"] == "pending"])
 
     filtered = []
     for r in rows:
@@ -476,6 +485,107 @@ def snooze_event(event_id):
         )
         db.commit()
     return redirect(request.referrer or url_for("dashboard"))
+
+
+MONTH_NAMES_PT = [
+    "", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+]
+WEEKDAY_NAMES_PT = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+
+
+def add_months(d, n):
+    month_index = d.month - 1 + n
+    year = d.year + month_index // 12
+    month = month_index % 12 + 1
+    return date(year, month, 1)
+
+
+def event_fallback_image(category):
+    safe_category = category if category in ("concert", "cultural", "trip") else "other"
+    return url_for("static", filename=f"img/{safe_category}.svg")
+
+
+def build_month_grid(month_start, events_by_date):
+    import calendar as calmod
+    cal = calmod.Calendar(firstweekday=0)  # semana começa à segunda
+    weeks = cal.monthdayscalendar(month_start.year, month_start.month)
+    grid_weeks = []
+    for week in weeks:
+        week_cells = []
+        for day in week:
+            if day == 0:
+                week_cells.append(None)
+                continue
+            iso = date(month_start.year, month_start.month, day).isoformat()
+            evs = events_by_date.get(iso, [])
+            week_cells.append({
+                "day": day,
+                "date": iso,
+                "has_accepted": any(e["status"] == "accepted" for e in evs),
+                "has_pending": any(e["status"] == "pending" for e in evs),
+                "events": evs,
+            })
+        grid_weeks.append(week_cells)
+    return {
+        "label": f"{MONTH_NAMES_PT[month_start.month]} {month_start.year}",
+        "weeks": grid_weeks,
+    }
+
+
+@app.route("/calendario")
+def calendar_view():
+    db = get_db()
+    reactivate_expired_snoozes(db)
+
+    month_starts = [add_months(date.today().replace(day=1), i) for i in range(3)]
+    range_start = month_starts[0].isoformat()
+    last_month = month_starts[-1]
+    import calendar as calmod
+    last_day = calmod.monthrange(last_month.year, last_month.month)[1]
+    range_end = date(last_month.year, last_month.month, last_day).isoformat()
+
+    rows = db.execute(
+        "SELECT * FROM events WHERE "
+        "(status = 'accepted' AND chosen_date BETWEEN ? AND ?) "
+        "OR (status = 'pending' AND event_date BETWEEN ? AND ?)",
+        (range_start, range_end, range_start, range_end),
+    ).fetchall()
+
+    pending_rows = filter_past_and_today_radius([r for r in rows if r["status"] == "pending"])
+    pending_ids = {r["id"] for r in pending_rows}
+    relevant_rows = [r for r in rows if r["status"] == "accepted" or r["id"] in pending_ids]
+
+    events_by_date = {}
+    for r in relevant_rows:
+        day_key = r["chosen_date"] if r["status"] == "accepted" else r["event_date"]
+        if not day_key:
+            continue
+        events_by_date.setdefault(day_key, []).append({
+            "id": r["id"],
+            "title": r["title"],
+            "category": r["category"],
+            "status": r["status"],
+            "status_label": STATUS_LABELS.get(r["status"], r["status"]),
+            "city": r["city"],
+            "venue": r["venue"],
+            "event_time": r["event_time"],
+            "price": r["price"],
+            "is_free": bool(r["is_free"]) if r["is_free"] is not None else None,
+            "distance_km": r["distance_km"],
+            "image_url": r["image_url"] or event_fallback_image(r["category"]),
+            "source_url": r["source_url"],
+        })
+
+    month_grids = [build_month_grid(m, events_by_date) for m in month_starts]
+
+    return render_template(
+        "calendar.html",
+        month_grids=month_grids,
+        events_by_date_json=json.dumps(events_by_date, ensure_ascii=False).replace("</", "<\\/"),
+        today=date.today().isoformat(),
+        weekday_names=WEEKDAY_NAMES_PT,
+    )
 
 
 @app.route("/events/manual", methods=["POST"])
