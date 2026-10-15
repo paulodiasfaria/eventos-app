@@ -18,14 +18,7 @@ Lista de melhorias a abordar em sessões futuras. Cada item deve ser movido para
 - Considerar guardar o último filtro usado (cookie ou localStorage) para não ter de reconfigurar sempre.
 
 ### 3) Alterar título da página
-- Atualmente: "Eventos da Vida".
-- Sugestões a validar com o utilizador:
-  - "Vida em Agenda"
-  - "Momentos" 
-  - "Rota & Palco" (concertos + viagens)
-  - "Agenda Lara & Cia" (toque pessoal, referência à filha)
-  - "Próxima Aventura"
-- Decidir e atualizar em `templates/base.html` (`<title>` e `<h1>`).
+- ✅ Decidido: "Agenda Família Faria Valadão" — atualizado em `templates/base.html`.
 
 ### 4) Alterar layout inicial
 - Repensar o dashboard atual (regras no topo, recomendações, próximos eventos, formulário manual).
@@ -33,4 +26,4 @@ Lista de melhorias a abordar em sessões futuras. Cada item deve ser movido para
 - Sem decisão tomada ainda — a abordar em sessão dedicada com mockup/feedback iterativo.
 
 ## Feito
-_(nada ainda)_
+- 2026-10-14 — Título da página alterado para "Agenda Família Faria Valadão".
