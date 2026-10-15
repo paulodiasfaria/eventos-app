@@ -43,6 +43,10 @@ h2 { margin-top: 36px; }
 .event-image { width: 100%; height: 150px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; }
 .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .hint { color: var(--muted); font-size: 13px; margin-top: -4px; }
+.filters-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; background: var(--card); padding: 14px; border-radius: 10px; }
+.filters-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.filters-form button { background: var(--accent); color: white; border: none; font-weight: 600; padding: 8px 14px; height: 34px; align-self: end; }
+.clear-filters { color: var(--muted); font-size: 13px; align-self: center; text-decoration: underline; }
 .event-head { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
 .badge { background: var(--accent); color: white; padding: 2px 8px; border-radius: 20px; font-size: 11px; text-transform: uppercase; }
 .event-card h3 { margin: 8px 0 4px; }

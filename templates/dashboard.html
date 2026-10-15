@@ -18,14 +18,49 @@
   </div>
 </section>
 
+<section class="filters">
+  <h2>🔎 Filtros</h2>
+  <form method="get" action="{{ url_for('dashboard') }}" class="filters-form">
+    <label>
+      Estado
+      <select name="status">
+        {% for key, label in status_labels.items() %}
+        <option value="{{ key }}" {% if key == status %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Categoria
+      <select name="category">
+        <option value="" {% if not filters.category %}selected{% endif %}>Todas</option>
+        <option value="concert" {% if filters.category == 'concert' %}selected{% endif %}>Concerto</option>
+        <option value="cultural" {% if filters.category == 'cultural' %}selected{% endif %}>Cultural</option>
+        <option value="trip" {% if filters.category == 'trip' %}selected{% endif %}>Viagem</option>
+        <option value="other" {% if filters.category == 'other' %}selected{% endif %}>Outro</option>
+      </select>
+    </label>
+    <label>Data de <input type="date" name="date_from" value="{{ filters.date_from }}"></label>
+    <label>Data até <input type="date" name="date_to" value="{{ filters.date_to }}"></label>
+    <label>Preço máx. (€) <input type="number" step="0.5" name="max_price" value="{{ filters.max_price }}"></label>
+    <label>Distância máx. (km) <input type="number" step="1" name="max_distance" value="{{ filters.max_distance }}"></label>
+    <label class="checkbox-label">
+      <input type="checkbox" name="free_only" {% if filters.free_only %}checked{% endif %}> Só grátis
+    </label>
+    <button type="submit">Aplicar filtros</button>
+    <a class="clear-filters" href="{{ url_for('dashboard') }}">Limpar</a>
+  </form>
+</section>
+
 <section class="recommendations">
-  <h2>✨ Recomendações (por aceitar)</h2>
+  <h2>✨ Eventos — {{ status_labels.get(status, status) }}</h2>
+  {% if status == 'pending' %}
   <p class="hint">Eventos já passados ou marcados para hoje fora de Lisboa/50km são filtrados automaticamente.</p>
-  {% if not pending %}
-    <p class="empty">Sem eventos pendentes. Adiciona manualmente ou espera pelo próximo fetch.</p>
+  {% endif %}
+  {% if not events %}
+    <p class="empty">Sem eventos para este filtro.</p>
   {% endif %}
   <div class="event-grid">
-    {% for e in pending %}
+    {% for e in events %}
     <div class="event-card">
       <img class="event-image"
            src="{{ e.image_url or url_for('static', filename='img/' + (e.category if e.category in ['concert','cultural','trip'] else 'other') + '.svg') }}"
@@ -34,7 +69,7 @@
 
       <div class="event-head">
         <span class="badge badge-{{ e.category }}">{{ e.category }}</span>
-        <span class="score">score {{ "%.1f"|format(e.score) }}</span>
+        {% if status == 'pending' %}<span class="score">score {{ "%.1f"|format(e.score) }}</span>{% endif %}
       </div>
       <h3>{{ e.title }}</h3>
       <p>
@@ -42,7 +77,8 @@
         {% if e.distance_km is not none %}· 📍 {{ e.distance_km|round(0)|int }} km{% endif %}
       </p>
       <p class="when">
-        {% if e.event_date %}📅 {{ e.event_date }}{% if e.event_date_end and e.event_date_end != e.event_date %} a {{ e.event_date_end }}{% endif %}{% endif %}
+        {% if e.chosen_date %}📅 Agendado: {{ e.chosen_date }}
+        {% elif e.event_date %}📅 {{ e.event_date }}{% if e.event_date_end and e.event_date_end != e.event_date %} a {{ e.event_date_end }}{% endif %}{% endif %}
         {% if e.event_time %} · 🕒 {{ e.event_time }}{% endif %}
       </p>
       <p class="tags">{{ e.tags }}</p>
@@ -51,28 +87,18 @@
       </p>
       {% if e.source_url %}<p><a href="{{ e.source_url }}" target="_blank">ver fonte</a></p>{% endif %}
 
+      {% if status == 'pending' %}
       <form method="post" action="{{ url_for('accept_event', event_id=e.id) }}" class="accept-form">
-        <input type="date" name="chosen_date" value="{{ e.event_date or e.chosen_date or today }}">
+        <input type="date" name="chosen_date" value="{{ e.event_date or today }}">
         <button type="submit" class="btn-accept">Aceitar</button>
       </form>
       <form method="post" action="{{ url_for('reject_event', event_id=e.id) }}">
         <button type="submit" class="btn-reject">Rejeitar</button>
       </form>
+      {% endif %}
     </div>
     {% endfor %}
   </div>
-</section>
-
-<section class="upcoming">
-  <h2>📅 Próximos eventos aceites</h2>
-  {% if not upcoming %}
-    <p class="empty">Nada agendado ainda.</p>
-  {% endif %}
-  <ul class="upcoming-list">
-    {% for e in upcoming %}
-    <li><b>{{ e.chosen_date }}</b> — {{ e.title }} ({{ e.category }}, {{ e.city }})</li>
-    {% endfor %}
-  </ul>
 </section>
 
 <section class="manual-add">

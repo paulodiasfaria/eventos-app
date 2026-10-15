@@ -254,17 +254,69 @@ def recompute_scores(db):
 
 def relevant_pending_query_rows(db):
     """Eventos pendentes, excluindo os que já passaram ou que hoje ficam fora do raio."""
-    today_iso = date.today().isoformat()
     rows = db.execute(
-        "SELECT * FROM events WHERE status = 'pending' "
-        "AND (event_date IS NULL OR event_date_end >= ? OR (event_date_end IS NULL AND event_date >= ?)) "
-        "ORDER BY score DESC, created_at DESC",
-        (today_iso, today_iso),
+        "SELECT * FROM events WHERE status = 'pending' ORDER BY score DESC, created_at DESC"
     ).fetchall()
+    return filter_past_and_today_radius(rows)
+
+
+def filter_past_and_today_radius(rows):
+    """Aplica a regra: nunca mostrar eventos já passados; eventos de hoje só se perto/Lisboa."""
+    today_iso = date.today().isoformat()
     filtered = []
     for r in rows:
-        if r["event_date"] == today_iso:
-            if not is_within_today_radius(r["city"], r["distance_km"]):
+        end = r["event_date_end"] or r["event_date"]
+        if end and end < today_iso:
+            continue
+        if r["event_date"] == today_iso and not is_within_today_radius(r["city"], r["distance_km"]):
+            continue
+        filtered.append(r)
+    return filtered
+
+
+STATUS_LABELS = {
+    "pending": "Proposto",
+    "accepted": "Aceite",
+    "rejected": "Rejeitado",
+    "snoozed": "Adiado",
+}
+
+
+def build_filtered_events(db, status, category=None, date_from=None, date_to=None,
+                           max_price=None, max_distance=None, free_only=False):
+    """Lista eventos filtrados por estado + categoria/datas/preço/distância."""
+    query = "SELECT * FROM events WHERE status = ?"
+    params = [status]
+    if category:
+        query += " AND category = ?"
+        params.append(category)
+    if date_from:
+        query += " AND (event_date IS NULL OR event_date >= ?)"
+        params.append(date_from)
+    if date_to:
+        query += " AND (event_date IS NULL OR event_date <= ?)"
+        params.append(date_to)
+    if status == "pending":
+        query += " ORDER BY score DESC, created_at DESC"
+    else:
+        query += " ORDER BY COALESCE(chosen_date, event_date, created_at) DESC"
+    rows = db.execute(query, params).fetchall()
+
+    if status == "pending":
+        rows = filter_past_and_today_radius(rows)
+
+    filtered = []
+    for r in rows:
+        if max_distance is not None:
+            d = resolve_distance_km(r["city"], r["distance_km"])
+            if d is None or d > max_distance:
+                continue
+        free = guess_is_free(r["price"], r["is_free"])
+        if free_only and free is not True:
+            continue
+        if max_price is not None and free is not True:
+            value = parse_price_value(r["price"])
+            if value is not None and value > max_price:
                 continue
         filtered.append(r)
     return filtered
@@ -328,18 +380,37 @@ def all_rule_statuses(db):
 def dashboard():
     db = get_db()
     recompute_scores(db)
-    pending = relevant_pending_query_rows(db)
-    upcoming = db.execute(
-        "SELECT * FROM events WHERE status = 'accepted' AND chosen_date >= ? ORDER BY chosen_date ASC",
-        (date.today().isoformat(),),
-    ).fetchall()
+
+    status = request.args.get("status", "pending")
+    if status not in STATUS_LABELS:
+        status = "pending"
+    category = request.args.get("category") or None
+    date_from = request.args.get("date_from") or None
+    date_to = request.args.get("date_to") or None
+    max_price = request.args.get("max_price", type=float)
+    max_distance = request.args.get("max_distance", type=float)
+    free_only = request.args.get("free_only") == "on"
+
+    events = build_filtered_events(
+        db, status, category=category, date_from=date_from, date_to=date_to,
+        max_price=max_price, max_distance=max_distance, free_only=free_only,
+    )
     rules_status = all_rule_statuses(db)
     return render_template(
         "dashboard.html",
-        pending=pending,
-        upcoming=upcoming,
+        events=events,
         rules_status=rules_status,
         today=date.today().isoformat(),
+        status=status,
+        status_labels=STATUS_LABELS,
+        filters={
+            "category": category or "",
+            "date_from": date_from or "",
+            "date_to": date_to or "",
+            "max_price": request.args.get("max_price", ""),
+            "max_distance": request.args.get("max_distance", ""),
+            "free_only": free_only,
+        },
     )
 
 
@@ -355,7 +426,7 @@ def accept_event(event_id):
         )
         db.commit()
         adjust_weights(db, json.loads(ev["tags"] or "[]"), +1.0)
-    return redirect(url_for("dashboard"))
+    return redirect(request.referrer or url_for("dashboard"))
 
 
 @app.route("/events/<int:event_id>/reject", methods=["POST"])
@@ -369,7 +440,7 @@ def reject_event(event_id):
         )
         db.commit()
         adjust_weights(db, json.loads(ev["tags"] or "[]"), -1.0)
-    return redirect(url_for("dashboard"))
+    return redirect(request.referrer or url_for("dashboard"))
 
 
 @app.route("/events/manual", methods=["POST"])
