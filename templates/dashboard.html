@@ -80,6 +80,7 @@
         {% if e.chosen_date %}📅 Agendado: {{ e.chosen_date }}
         {% elif e.event_date %}📅 {{ e.event_date }}{% if e.event_date_end and e.event_date_end != e.event_date %} a {{ e.event_date_end }}{% endif %}{% endif %}
         {% if e.event_time %} · 🕒 {{ e.event_time }}{% endif %}
+        {% if status == 'snoozed' and e.snoozed_until %} · ⏳ volta em {{ e.snoozed_until }}{% endif %}
       </p>
       <p class="tags">{{ e.tags }}</p>
       <p class="price">
@@ -94,6 +95,10 @@
       </form>
       <form method="post" action="{{ url_for('reject_event', event_id=e.id) }}">
         <button type="submit" class="btn-reject">Rejeitar</button>
+      </form>
+      <form method="post" action="{{ url_for('snooze_event', event_id=e.id) }}" class="snooze-form">
+        <input type="number" name="snooze_days" value="14" min="1" title="dias a adiar">
+        <button type="submit" class="btn-snooze">Adiar</button>
       </form>
       {% endif %}
     </div>

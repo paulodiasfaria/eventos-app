@@ -138,6 +138,7 @@ EXTRA_EVENT_COLUMNS = {
     "distance_km": "REAL",      # distancia a Lisboa, se conhecida/fornecida
     "is_free": "INTEGER",       # 1 = gratuito, 0 = pago, NULL = desconhecido
     "image_url": "TEXT",        # foto ilustrativa do evento
+    "snoozed_until": "TEXT",    # data (YYYY-MM-DD) em que um evento "adiado" volta a pending
 }
 
 
@@ -249,6 +250,17 @@ def recompute_scores(db):
     for r in rows:
         s = score_event(db, r)
         db.execute("UPDATE events SET score = ? WHERE id = ?", (s, r["id"]))
+    db.commit()
+
+
+def reactivate_expired_snoozes(db):
+    """Eventos 'adiados' cuja data de reaparecimento já passou voltam a 'pending'."""
+    today_iso = date.today().isoformat()
+    db.execute(
+        "UPDATE events SET status='pending', snoozed_until=NULL "
+        "WHERE status='snoozed' AND snoozed_until IS NOT NULL AND snoozed_until <= ?",
+        (today_iso,),
+    )
     db.commit()
 
 
@@ -379,6 +391,7 @@ def all_rule_statuses(db):
 @app.route("/")
 def dashboard():
     db = get_db()
+    reactivate_expired_snoozes(db)
     recompute_scores(db)
 
     status = request.args.get("status", "pending")
@@ -440,6 +453,28 @@ def reject_event(event_id):
         )
         db.commit()
         adjust_weights(db, json.loads(ev["tags"] or "[]"), -1.0)
+    return redirect(request.referrer or url_for("dashboard"))
+
+
+SNOOZE_DEFAULT_DAYS = 14
+
+
+@app.route("/events/<int:event_id>/snooze", methods=["POST"])
+def snooze_event(event_id):
+    """Adia um evento: fica fora da lista de pendentes até snoozed_until, sem afetar pesos."""
+    db = get_db()
+    ev = db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+    if ev:
+        try:
+            days = int(request.form.get("snooze_days") or SNOOZE_DEFAULT_DAYS)
+        except ValueError:
+            days = SNOOZE_DEFAULT_DAYS
+        snoozed_until = (date.today() + timedelta(days=days)).isoformat()
+        db.execute(
+            "UPDATE events SET status='snoozed', snoozed_until=? WHERE id=?",
+            (snoozed_until, event_id),
+        )
+        db.commit()
     return redirect(request.referrer or url_for("dashboard"))
 
 
@@ -604,6 +639,7 @@ def api_top_recommendations():
     if unauthorized:
         return unauthorized
     db = get_db()
+    reactivate_expired_snoozes(db)
     recompute_scores(db)
     limit = int(request.args.get("limit", 3))
     rows = relevant_pending_query_rows(db)[:limit]

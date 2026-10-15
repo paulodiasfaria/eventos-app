@@ -67,6 +67,9 @@ input, select, button {
 button { cursor: pointer; }
 .btn-accept { background: var(--ok); color: #0a1a12; border: none; font-weight: 600; }
 .btn-reject { background: transparent; color: var(--overdue); border: 1px solid var(--overdue); margin-top: 6px; width: 100%; }
+.snooze-form { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
+.snooze-form input[type="number"] { width: 55px; }
+.btn-snooze { background: transparent; color: var(--at_risk, #d9a200); border: 1px solid var(--at_risk, #d9a200); flex: 1; }
 
 .upcoming-list { list-style: none; padding: 0; }
 .upcoming-list li { background: var(--card); margin-bottom: 8px; padding: 10px 14px; border-radius: 8px; }
