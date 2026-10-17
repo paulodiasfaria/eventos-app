@@ -10,14 +10,8 @@ Lista de melhorias a abordar em sessões futuras. Cada item deve ser movido para
 - Sem decisão tomada ainda — a abordar em sessão dedicada com mockup/feedback iterativo.
 - Relacionado com o item 7 (ecrã de calendário).
 
-### 7) Ecrã de calendário (3 meses)
-- Novo ecrã/rota (ex: `/calendario`) com vista de calendário de 3 meses (mês atual + 2 seguintes).
-- Dias com eventos ACEITES aparecem marcados; dias com PROPOSTAS pendentes aparecem a amarelo.
-- Tooltip ao passar o rato num dia: nome do(s) evento(s) e características principais (categoria, hora, preço).
-- Clicar no dia abre o card completo do evento (modal ou navega para a vista de detalhe).
-- Vai precisar de uma rota de detalhe de evento por id (hoje não existe, só existe a listagem).
-
 ## Feito
+- 2026-10-17 — Item 7 (ecrã de calendário): já estava implementado em sessão anterior não registada no backlog — rota `/calendario`, grid de 3 meses, legenda aceite/pendente, clique no dia abre modal com detalhe completo. Confirmado em produção (200 OK).
 - 2026-10-15 — Item 6 (ação "Adiar"): botão "Adiar N dias" na UI (default 14), coluna `snoozed_until`, e reativação automática para `pending` quando a data passa (sem afetar pesos de preferência).
 - 2026-10-14 — Título da página alterado para "Agenda Família Faria Valadão".
 - 2026-10-14 — Imagens de fallback por categoria (SVG) + cron tenta extrair `og:image` via curl (opção 3 original: colar foto manualmente já era possível).
