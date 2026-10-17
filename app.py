@@ -632,6 +632,35 @@ def require_api_key():
     return None
 
 
+@app.route("/api/events/search", methods=["GET"])
+def api_search_events():
+    """Procura eventos por título (substring, case-insensitive) — útil para encontrar o id."""
+    unauthorized = require_api_key()
+    if unauthorized:
+        return unauthorized
+    db = get_db()
+    q = request.args.get("q", "").strip()
+    rows = db.execute(
+        "SELECT id, title, status, event_date, event_date_end, event_time, city, venue "
+        "FROM events WHERE title LIKE ? ORDER BY id DESC LIMIT 20",
+        (f"%{q}%",),
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/events/<int:event_id>", methods=["GET"])
+def api_get_event(event_id):
+    unauthorized = require_api_key()
+    if unauthorized:
+        return unauthorized
+    db = get_db()
+    ev = db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+    if not ev:
+        return jsonify({"error": "not_found"}), 404
+    cols = ["id", "title", "status", "event_date", "event_date_end", "event_time", "city", "venue"]
+    return jsonify({c: ev[c] for c in cols})
+
+
 @app.route("/api/events/<int:event_id>", methods=["PATCH"])
 def api_update_event(event_id):
     """Atualiza campos pontuais de um evento existente (ex. corrigir event_date_end
