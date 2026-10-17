@@ -657,7 +657,7 @@ def api_get_event(event_id):
     ev = db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
     if not ev:
         return jsonify({"error": "not_found"}), 404
-    cols = ["id", "title", "status", "event_date", "event_date_end", "event_time", "city", "venue"]
+    cols = ["id", "title", "status", "event_date", "event_date_end", "event_time", "chosen_date", "city", "venue"]
     return jsonify({c: ev[c] for c in cols})
 
 
@@ -673,7 +673,7 @@ def api_update_event(event_id):
     if not ev:
         return jsonify({"error": "not_found"}), 404
     payload = request.get_json(force=True) or {}
-    allowed = {"event_date", "event_date_end", "event_time", "notes", "distance_km", "source_url"}
+    allowed = {"event_date", "event_date_end", "event_time", "notes", "distance_km", "source_url", "title", "chosen_date", "city", "venue"}
     updates = {k: v for k, v in payload.items() if k in allowed}
     if not updates:
         return jsonify({"error": "no_valid_fields", "allowed": sorted(allowed)}), 400
