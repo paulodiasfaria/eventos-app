@@ -632,6 +632,29 @@ def require_api_key():
     return None
 
 
+@app.route("/api/events/<int:event_id>", methods=["PATCH"])
+def api_update_event(event_id):
+    """Atualiza campos pontuais de um evento existente (ex. corrigir event_date_end
+    quando a fonte original não indicava a duração real do evento)."""
+    unauthorized = require_api_key()
+    if unauthorized:
+        return unauthorized
+    db = get_db()
+    ev = db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+    if not ev:
+        return jsonify({"error": "not_found"}), 404
+    payload = request.get_json(force=True) or {}
+    allowed = {"event_date", "event_date_end", "event_time", "notes", "distance_km", "source_url"}
+    updates = {k: v for k, v in payload.items() if k in allowed}
+    if not updates:
+        return jsonify({"error": "no_valid_fields", "allowed": sorted(allowed)}), 400
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    db.execute(f"UPDATE events SET {set_clause} WHERE id = ?", (*updates.values(), event_id))
+    db.commit()
+    updated = db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+    return jsonify({k: updated[k] for k in ("id", "title", "event_date", "event_date_end", "event_time")})
+
+
 def should_skip_event(item):
     """Decide se um evento candidato deve ser ignorado: já passou, ou é hoje mas longe."""
     today_iso = date.today().isoformat()
