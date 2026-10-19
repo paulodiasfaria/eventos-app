@@ -72,6 +72,10 @@ button { cursor: pointer; }
 .snooze-form input[type="number"] { width: 55px; }
 .btn-snooze { background: transparent; color: var(--at_risk, #d9a200); border: 1px solid var(--at_risk, #d9a200); flex: 1; }
 
+.status-form { display: flex; gap: 6px; margin-top: 6px; }
+.status-form select { flex: 1; }
+.btn-status { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+
 .upcoming-list { list-style: none; padding: 0; }
 .upcoming-list li { background: var(--card); margin-bottom: 8px; padding: 10px 14px; border-radius: 8px; }
 

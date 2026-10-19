@@ -102,6 +102,14 @@
         <button type="submit" class="btn-snooze">Adiar</button>
       </form>
       {% endif %}
+      <form method="post" action="{{ url_for('set_event_status', event_id=e.id) }}" class="status-form">
+        <select name="status">
+          {% for key, label in status_labels.items() if key != 'all' %}
+          <option value="{{ key }}" {% if key == e.status %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn-status">Mudar estado</button>
+      </form>
     </div>
     {% endfor %}
   </div>

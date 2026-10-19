@@ -487,6 +487,28 @@ def snooze_event(event_id):
     return redirect(request.referrer or url_for("dashboard"))
 
 
+@app.route("/events/<int:event_id>/set-status", methods=["POST"])
+def set_event_status(event_id):
+    """Permite mudar o estado de um evento diretamente pela UI, sem passar
+    pelo fluxo normal de aceitar/rejeitar/adiar (ex: corrigir um estado errado)."""
+    VALID_STATUSES = {"pending", "accepted", "rejected", "snoozed"}
+    new_status = request.form.get("status")
+    if new_status not in VALID_STATUSES:
+        return redirect(request.referrer or url_for("dashboard"))
+    db = get_db()
+    ev = db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+    if ev:
+        if new_status == "snoozed":
+            snoozed_until = (date.today() + timedelta(days=SNOOZE_DEFAULT_DAYS)).isoformat()
+            db.execute("UPDATE events SET status=?, snoozed_until=? WHERE id=?",
+                       (new_status, snoozed_until, event_id))
+        else:
+            db.execute("UPDATE events SET status=?, snoozed_until=NULL WHERE id=?",
+                       (new_status, event_id))
+        db.commit()
+    return redirect(request.referrer or url_for("dashboard"))
+
+
 MONTH_NAMES_PT = [
     "", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
@@ -673,15 +695,18 @@ def api_update_event(event_id):
     if not ev:
         return jsonify({"error": "not_found"}), 404
     payload = request.get_json(force=True) or {}
-    allowed = {"event_date", "event_date_end", "event_time", "notes", "distance_km", "source_url", "title", "chosen_date", "city", "venue"}
+    allowed = {"event_date", "event_date_end", "event_time", "notes", "distance_km", "source_url", "title", "chosen_date", "city", "venue", "status"}
+    VALID_STATUSES = {"pending", "accepted", "rejected", "snoozed"}
     updates = {k: v for k, v in payload.items() if k in allowed}
+    if "status" in updates and updates["status"] not in VALID_STATUSES:
+        return jsonify({"error": "invalid_status", "allowed": sorted(VALID_STATUSES)}), 400
     if not updates:
         return jsonify({"error": "no_valid_fields", "allowed": sorted(allowed)}), 400
     set_clause = ", ".join(f"{k} = ?" for k in updates)
     db.execute(f"UPDATE events SET {set_clause} WHERE id = ?", (*updates.values(), event_id))
     db.commit()
     updated = db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
-    return jsonify({k: updated[k] for k in ("id", "title", "event_date", "event_date_end", "event_time")})
+    return jsonify({k: updated[k] for k in ("id", "title", "status", "event_date", "event_date_end", "event_time")})
 
 
 def should_skip_event(item):
