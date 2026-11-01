@@ -397,11 +397,6 @@ def all_rule_statuses(db):
 # Routes - UI
 # ---------------------------------------------------------------------------
 
-@app.route("/")
-def root_redirect():
-    return redirect(url_for("dashboard"))
-
-
 @app.route("/eventos")
 def dashboard():
     db = get_db()
