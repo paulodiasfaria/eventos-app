@@ -66,6 +66,16 @@ function openDayModal(dateStr) {
         <p>${e.event_time ? '🕒 ' + escapeHtml(e.event_time) : ''}</p>
         <p>${e.is_free ? '🟢 Grátis' : (e.price ? '💶 ' + escapeHtml(e.price) : '')}</p>
         ${e.source_url ? `<p><a href="${escapeHtml(e.source_url)}" target="_blank">ver fonte</a></p>` : ''}
+        ${e.status === 'pending' ? `
+        <div class="modal-actions">
+          <form method="post" action="${escapeHtml(e.accept_url)}" class="accept-form">
+            <input type="date" name="chosen_date" value="${escapeHtml(e.event_date || dateStr)}">
+            <button type="submit" class="btn-accept">Aceitar</button>
+          </form>
+          <form method="post" action="${escapeHtml(e.reject_url)}">
+            <button type="submit" class="btn-reject">Rejeitar</button>
+          </form>
+        </div>` : ''}
       </div>
     </div>`).join('');
   content.innerHTML = header + body;

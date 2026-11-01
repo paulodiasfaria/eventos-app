@@ -313,9 +313,9 @@ def build_filtered_events(db, status, category=None, date_from=None, date_to=Non
         query += " AND (event_date IS NULL OR event_date <= ?)"
         params.append(date_to)
     if status == "pending":
-        query += " ORDER BY score DESC, created_at DESC"
+        query += " ORDER BY COALESCE(event_date, created_at) ASC"
     else:
-        query += " ORDER BY COALESCE(chosen_date, event_date, created_at) DESC"
+        query += " ORDER BY COALESCE(chosen_date, event_date, created_at) ASC"
     rows = db.execute(query, params).fetchall()
 
     if status == "pending":
@@ -398,6 +398,11 @@ def all_rule_statuses(db):
 # ---------------------------------------------------------------------------
 
 @app.route("/")
+def root_redirect():
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/eventos")
 def dashboard():
     db = get_db()
     reactivate_expired_snoozes(db)
@@ -597,6 +602,9 @@ def calendar_view():
             "distance_km": r["distance_km"],
             "image_url": r["image_url"] or event_fallback_image(r["category"]),
             "source_url": r["source_url"],
+            "accept_url": url_for("accept_event", event_id=r["id"]),
+            "reject_url": url_for("reject_event", event_id=r["id"]),
+            "event_date": r["event_date"],
         })
 
     month_grids = [build_month_grid(m, events_by_date) for m in month_starts]

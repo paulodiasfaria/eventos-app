@@ -122,3 +122,6 @@ button { cursor: pointer; }
 .modal-event-image { width: 90px; height: 70px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
 .modal-event-info h4 { margin: 4px 0; }
 .modal-event-info p { margin: 2px 0; font-size: 13px; color: var(--muted); }
+.modal-actions { display: flex; gap: 8px; margin-top: 8px; }
+.modal-actions .accept-form { display: flex; gap: 6px; }
+.modal-actions .btn-reject { margin-top: 0; width: auto; }
