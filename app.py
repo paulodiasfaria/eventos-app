@@ -29,6 +29,18 @@ TODAY_RADIUS_KM = 50  # eventos no dia de hoje só interessam dentro deste raio 
 
 app = Flask(__name__)
 
+
+@app.context_processor
+def inject_asset_version():
+    """Cache-bust static/style.css automaticamente usando a data de
+    modificação do ficheiro - evita o browser mostrar CSS desatualizado
+    depois de um deploy (git pull + reload)."""
+    try:
+        css_path = os.path.join(app.static_folder, "style.css")
+        return {"asset_version": int(os.path.getmtime(css_path))}
+    except OSError:
+        return {"asset_version": 0}
+
 # Distancias aproximadas (km por estrada) de cidades/concelhos comuns a Lisboa.
 # Usado como fallback quando o cron nao fornece distance_km explicitamente.
 CITY_DISTANCE_KM = {
