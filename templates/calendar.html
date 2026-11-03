@@ -72,7 +72,7 @@ function openDayModal(dateStr) {
             <input type="date" name="chosen_date" value="${escapeHtml(e.event_date || dateStr)}" onclick="this.showPicker && this.showPicker()">
             <button type="submit" class="btn-accept">Aceitar</button>
           </form>
-          <form method="post" action="${escapeHtml(e.reject_url)}">
+          <form method="post" action="${escapeHtml(e.reject_url)}" class="reject-form">
             <button type="submit" class="btn-reject">Rejeitar</button>
           </form>
         </div>` : ''}
