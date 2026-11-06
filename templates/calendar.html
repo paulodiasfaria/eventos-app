@@ -44,6 +44,7 @@
 
 <script>
 const EVENTS_BY_DATE = {{ events_by_date_json | safe }};
+const STATUS_LABELS = {{ status_labels | tojson }};
 
 function escapeHtml(str) {
   const div = document.createElement('div');
@@ -76,6 +77,20 @@ function openDayModal(dateStr) {
             <button type="submit" class="btn-reject">Rejeitar</button>
           </form>
         </div>` : ''}
+        <div class="modal-actions modal-actions-manage">
+          <form method="post" action="${escapeHtml(e.date_update_url)}" class="date-update-form">
+            <input type="date" name="chosen_date" value="${escapeHtml(e.chosen_date || e.event_date || dateStr)}" onclick="this.showPicker && this.showPicker()">
+            <button type="submit" class="btn-update-date">Alterar data</button>
+          </form>
+          <form method="post" action="${escapeHtml(e.status_update_url)}" class="status-form">
+            <select name="status">
+              ${Object.keys(STATUS_LABELS).filter(k => k !== 'all').map(k =>
+                `<option value="${k}"${k === e.status ? ' selected' : ''}>${escapeHtml(STATUS_LABELS[k])}</option>`
+              ).join('')}
+            </select>
+            <button type="submit" class="btn-status">Mudar estado</button>
+          </form>
+        </div>
       </div>
     </div>`).join('');
   content.innerHTML = header + body;

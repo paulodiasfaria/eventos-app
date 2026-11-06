@@ -67,7 +67,7 @@ input, select, button {
 }
 button { cursor: pointer; }
 .btn-accept { background: var(--ok); color: #0a1a12; border: none; font-weight: 600; }
-.btn-reject { background: transparent; color: var(--overdue); border: 1px solid var(--overdue); margin-top: 6px; width: 100%; }
+.btn-reject { background: transparent; color: var(--overdue); border: 1px solid var(--overdue); margin-top: 6px; width: 100%; font-weight: 600; font-size: 15px; padding: 10px 12px; }
 .snooze-form { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
 .snooze-form input[type="number"] { width: 55px; }
 .btn-snooze { background: transparent; color: var(--at_risk, #d9a200); border: 1px solid var(--at_risk, #d9a200); flex: 1; }
@@ -126,5 +126,11 @@ button { cursor: pointer; }
 .modal-actions .accept-form { flex: 1; display: flex; gap: 6px; align-items: stretch; }
 .modal-actions form.reject-form { flex: 0 0 auto; display: flex; align-items: stretch; }
 .modal-actions .accept-form input[type="date"] { flex: 1; min-width: 0; box-sizing: border-box; padding: 0 8px; }
-.modal-actions .btn-reject { margin-top: 0; width: auto; box-sizing: border-box; padding: 0 16px; white-space: nowrap; }
-.modal-actions .btn-accept { margin-top: 0; flex: 0 0 auto; box-sizing: border-box; padding: 0 14px; white-space: nowrap; }
+.modal-actions .btn-reject { margin-top: 0; width: auto; box-sizing: border-box; padding: 0 20px; white-space: nowrap; font-size: 15px; }
+.modal-actions .btn-accept { margin-top: 0; flex: 0 0 auto; box-sizing: border-box; padding: 0 14px; white-space: nowrap; font-size: 13px; }
+
+.modal-actions-manage { flex-wrap: wrap; }
+.modal-actions-manage form { flex: 1 1 auto; display: flex; gap: 6px; align-items: stretch; min-width: 160px; }
+.modal-actions-manage input[type="date"] { flex: 1; min-width: 0; box-sizing: border-box; padding: 0 8px; }
+.modal-actions-manage select { flex: 1; min-width: 0; }
+.btn-update-date { background: transparent; color: var(--accent); border: 1px solid var(--accent); box-sizing: border-box; padding: 0 10px; white-space: nowrap; }

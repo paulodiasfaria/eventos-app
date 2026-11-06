@@ -521,6 +521,25 @@ def set_event_status(event_id):
     return redirect(request.referrer or url_for("dashboard"))
 
 
+@app.route("/events/<int:event_id>/update-date", methods=["POST"])
+def update_event_date(event_id):
+    """Permite corrigir a data de um evento diretamente pela UI (ex: no calendário,
+    para um evento já aceite, sem ter de usar a API /api/events/<id> por PATCH).
+    Para eventos aceites atualiza chosen_date; para os restantes, event_date."""
+    new_date = request.form.get("chosen_date") or request.form.get("event_date")
+    if not new_date:
+        return redirect(request.referrer or url_for("dashboard"))
+    db = get_db()
+    ev = db.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+    if ev:
+        if ev["status"] == "accepted":
+            db.execute("UPDATE events SET chosen_date=? WHERE id=?", (new_date, event_id))
+        else:
+            db.execute("UPDATE events SET event_date=? WHERE id=?", (new_date, event_id))
+        db.commit()
+    return redirect(request.referrer or url_for("dashboard"))
+
+
 MONTH_NAMES_PT = [
     "", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
@@ -611,7 +630,10 @@ def calendar_view():
             "source_url": r["source_url"],
             "accept_url": url_for("accept_event", event_id=r["id"]),
             "reject_url": url_for("reject_event", event_id=r["id"]),
+            "status_update_url": url_for("set_event_status", event_id=r["id"]),
+            "date_update_url": url_for("update_event_date", event_id=r["id"]),
             "event_date": r["event_date"],
+            "chosen_date": r["chosen_date"],
         })
 
     month_grids = [build_month_grid(m, events_by_date) for m in month_starts]
@@ -622,6 +644,7 @@ def calendar_view():
         events_by_date_json=json.dumps(events_by_date, ensure_ascii=False).replace("</", "<\\/"),
         today=date.today().isoformat(),
         weekday_names=WEEKDAY_NAMES_PT,
+        status_labels=STATUS_LABELS,
     )
 
 
