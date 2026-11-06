@@ -10,18 +10,8 @@ Lista de melhorias a abordar em sessões futuras. Cada item deve ser movido para
 - Sem decisão tomada ainda — a abordar em sessão dedicada com mockup/feedback iterativo.
 - Relacionado com o item 7 (ecrã de calendário).
 
-### 11) Alterar estado e data do evento a partir da vista de calendário
-- No modal de detalhe de um dia no `/calendario`, permitir mudar o estado do evento (ex: aceite/rejeitado/adiado/pendente) diretamente ali, sem ter de ir ao dashboard.
-- Para eventos já aceites mostrados no calendário, também poder alterar a data (tal como acontece nos outros estados/ecrãs).
-- Reaproveitar a rota `set_event_status` já existente no dashboard (e a rota de correção de data via PATCH `/api/events/<id>`).
-
-### 12) Crawler privilegiar páginas em português
-- No cron de procura de eventos, quando uma fonte/resultado tiver versão em português e noutra língua, privilegiar sempre a página em português (ex: para extrair descrição, data, imagem).
-
-### 13) Botão "Rejeitar" maior que "Aceitar"
-- Nos cards de evento proposto (dashboard e calendário), o botão "Rejeitar" deve ser visualmente maior que o "Aceitar" (atualmente têm o mesmo tamanho — ver screenshot do utilizador, card "Festa do Jazz").
-
 ## Feito
+- 2026-11-06 — Itens 11-13: (11) modal de detalhe de dia no `/calendario` agora tem sempre "Alterar data" + "Mudar estado" para qualquer evento (inclui aceites — nova rota `update_event_date`, atualiza `chosen_date` se aceite ou `event_date` nos restantes); (12) prompt do cron "Procura de Eventos" passou a ter um passo 0 a exigir preferência por páginas em português quando a fonte tem versão noutra língua; (13) botão "Rejeitar" agora maior/mais destacado que "Aceitar" no dashboard e no calendário. Testado localmente (POST às novas rotas + screenshot do dashboard/calendário).
 - 2026-11-06 — Item 8 (caixa de calendário em todos os campos de data): faltava `onclick="showPicker()"` em 3 inputs (Aceitar no dashboard, data/data fim do formulário manual) — adicionado; o modal do calendário já tinha.
 - 2026-11-06 — Item 9 (evitar duplicados na importação): `/api/events` agora deteta duplicados por título normalizado (sem acentos/pontuação) com similaridade ≥85% + mesma data (tolerância 2 dias) ou mesma cidade quando nenhum dos dois tem data; testado localmente com títulos quase-iguais. Criado `dedupe_events.py` (dry-run por omissão, `--apply` para remover) para limpar duplicados já existentes na BD — mantém o evento com status não-pending, depois o que tem imagem, depois o id mais antigo. Falta o utilizador correr `python dedupe_events.py --apply` na consola do PythonAnywhere para limpar a BD de produção.
 - 2026-11-06 — Item 10 (foto via pesquisa web quando não há imagem própria): prompt do cron "Procura de Eventos" atualizado — quando a extração de `og:image`/`twitter:image` falha, faz agora uma pesquisa web por "<evento/artista> foto" antes de cair no SVG genérico.
