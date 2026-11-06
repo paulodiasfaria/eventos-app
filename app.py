@@ -724,6 +724,55 @@ def api_update_event(event_id):
     return jsonify({k: updated[k] for k in ("id", "title", "status", "event_date", "event_date_end", "event_time")})
 
 
+def normalize_event_title(title):
+    """Normaliza um titulo para comparacao: sem acentos, minusculas, sem pontuacao, espacos colapsados."""
+    if not title:
+        return ""
+    t = unicodedata.normalize("NFKD", title)
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    t = t.lower().strip()
+    t = re.sub(r"[^a-z0-9\s]", " ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+def _title_similarity(a, b):
+    import difflib
+
+    return difflib.SequenceMatcher(None, normalize_event_title(a), normalize_event_title(b)).ratio()
+
+
+def find_duplicate_event(db, item, event_date, exclude_id=None):
+    """Deteta duplicados: titulo igual/muito semelhante (>=0.85) e mesma data (ou proxima, <=2 dias),
+    ou titulo igual/semelhante + mesma cidade quando nenhum dos dois tem data. Devolve o id existente
+    ou None."""
+    title = item.get("title")
+    if not title:
+        return None
+    rows = db.execute("SELECT id, title, city, event_date FROM events").fetchall()
+    for row in rows:
+        if exclude_id is not None and row["id"] == exclude_id:
+            continue
+        if _title_similarity(title, row["title"]) < 0.85:
+            continue
+        other_date = row["event_date"]
+        if event_date and other_date:
+            try:
+                d1 = date.fromisoformat(event_date)
+                d2 = date.fromisoformat(other_date)
+                if abs((d1 - d2).days) <= 2:
+                    return row["id"]
+            except ValueError:
+                if event_date == other_date:
+                    return row["id"]
+        elif not event_date and not other_date:
+            city_a = (item.get("city") or "").strip().lower()
+            city_b = (row["city"] or "").strip().lower()
+            if city_a == city_b:
+                return row["id"]
+    return None
+
+
 def should_skip_event(item):
     """Decide se um evento candidato deve ser ignorado: já passou, ou é hoje mas longe."""
     today_iso = date.today().isoformat()
@@ -760,18 +809,18 @@ def api_add_events():
         if skip:
             skipped.append({"title": item.get("title"), "reason": reason})
             continue
-        # evita duplicados óbvios pelo título+cidade
-        existing = db.execute(
-            "SELECT id FROM events WHERE title = ? AND city = ?", (item.get("title"), item.get("city"))
-        ).fetchone()
-        if existing:
-            continue
 
         event_date = item.get("event_date")
         if not event_date and item.get("date_options"):
             opts = item.get("date_options") or []
             if opts:
                 event_date = sorted(opts)[0]
+
+        # evita duplicados: titulo igual/muito semelhante + mesma data (ou proxima) ou mesma cidade
+        dup_id = find_duplicate_event(db, item, event_date)
+        if dup_id:
+            skipped.append({"title": item.get("title"), "reason": f"duplicado do evento #{dup_id}"})
+            continue
 
         is_free_flag = item.get("is_free")
         db.execute(

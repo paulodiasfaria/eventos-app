@@ -10,6 +10,17 @@ Lista de melhorias a abordar em sessões futuras. Cada item deve ser movido para
 - Sem decisão tomada ainda — a abordar em sessão dedicada com mockup/feedback iterativo.
 - Relacionado com o item 7 (ecrã de calendário).
 
+### 8) Caixa de calendário em todos os campos de data
+- Todos os campos de data (`<input type="date">`) devem abrir a caixa de calendário nativa ao clicar em qualquer ponto do campo, não só no ícone.
+- Verificar se já está aplicado em todos os pontos (filtros, modal do calendário, formulário manual) ou se falta em algum.
+
+### 9) Evitar eventos duplicados na importação
+- A BD tem eventos repetidos. Ao importar (via `/api/events`, cron de procura), detetar e ignorar duplicados antes de inserir (ex: mesmo título + data, ou título muito semelhante + data próxima).
+- Também considerar uma limpeza pontual dos duplicados já existentes na BD.
+
+### 10) Procurar foto na web quando o evento não tem imagem própria
+- Quando um evento não tem imagem própria (cai no fallback SVG por categoria), fazer pesquisa na web para encontrar uma foto real do evento ou do artista/local associado, em vez de ficar só com o SVG genérico.
+
 ## Feito
 - 2026-10-17 — Item 7 (ecrã de calendário): já estava implementado em sessão anterior não registada no backlog — rota `/calendario`, grid de 3 meses, legenda aceite/pendente, clique no dia abre modal com detalhe completo. Confirmado em produção (200 OK).
 - 2026-10-15 — Item 6 (ação "Adiar"): botão "Adiar N dias" na UI (default 14), coluna `snoozed_until`, e reativação automática para `pending` quando a data passa (sem afetar pesos de preferência).

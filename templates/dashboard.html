@@ -74,7 +74,7 @@
 
       {% if e.status == 'pending' %}
       <form method="post" action="{{ url_for('accept_event', event_id=e.id) }}" class="accept-form">
-        <input type="date" name="chosen_date" value="{{ e.event_date or today }}">
+        <input type="date" name="chosen_date" value="{{ e.event_date or today }}" onclick="this.showPicker && this.showPicker()">
         <button type="submit" class="btn-accept">Aceitar</button>
       </form>
       <form method="post" action="{{ url_for('reject_event', event_id=e.id) }}">
@@ -111,8 +111,8 @@
     <input type="text" name="city" placeholder="Cidade">
     <input type="text" name="country" placeholder="País">
     <input type="text" name="venue" placeholder="Local/Venue">
-    <input type="date" name="event_date" placeholder="Data do evento">
-    <input type="date" name="event_date_end" placeholder="Data fim (opcional)">
+    <input type="date" name="event_date" placeholder="Data do evento" onclick="this.showPicker && this.showPicker()">
+    <input type="date" name="event_date_end" placeholder="Data fim (opcional)" onclick="this.showPicker && this.showPicker()">
     <input type="time" name="event_time" placeholder="Hora">
     <input type="number" step="0.1" name="distance_km" placeholder="Distância a Lisboa (km)">
     <label class="checkbox-label"><input type="checkbox" name="is_free"> Grátis</label>
