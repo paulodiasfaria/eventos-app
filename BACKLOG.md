@@ -14,6 +14,9 @@ Lista de melhorias a abordar em sessões futuras. Cada item deve ser movido para
 - Além do formulário manual completo, ter uma opção de adicionar um evento só com um URL (ex: página do evento/bilhética).
 - Fica como "pendente de preenchimento" (campos em branco) até o cron diário de procura de eventos correr; nessa run, visita esse link e preenche título/data/local/imagem/etc automaticamente, tal como faz para os eventos que ele próprio encontra.
 
+### 15) Adicionar ícone (favicon) ao site
+- A app não tem favicon — adicionar um ícone simples (ex: SVG/PNG na pasta static, ligado via `<link rel="icon">` no `base.html`) que represente a app (ex: calendário/agenda).
+
 ## Feito
 - 2026-11-06 — Itens 11-13: (11) modal de detalhe de dia no `/calendario` agora tem sempre "Alterar data" + "Mudar estado" para qualquer evento (inclui aceites — nova rota `update_event_date`, atualiza `chosen_date` se aceite ou `event_date` nos restantes); (12) prompt do cron "Procura de Eventos" passou a ter um passo 0 a exigir preferência por páginas em português quando a fonte tem versão noutra língua; (13) botão "Rejeitar" agora maior/mais destacado que "Aceitar" no dashboard e no calendário. Testado localmente (POST às novas rotas + screenshot do dashboard/calendário).
 - 2026-11-06 — Item 8 (caixa de calendário em todos os campos de data): faltava `onclick="showPicker()"` em 3 inputs (Aceitar no dashboard, data/data fim do formulário manual) — adicionado; o modal do calendário já tinha.
