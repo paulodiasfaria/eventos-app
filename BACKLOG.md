@@ -10,9 +10,16 @@ Lista de melhorias a abordar em sessões futuras. Cada item deve ser movido para
 - Sem decisão tomada ainda — a abordar em sessão dedicada com mockup/feedback iterativo.
 - Relacionado com o item 7 (ecrã de calendário).
 
-### 11) Alterar estado do evento a partir da vista de calendário
+### 11) Alterar estado e data do evento a partir da vista de calendário
 - No modal de detalhe de um dia no `/calendario`, permitir mudar o estado do evento (ex: aceite/rejeitado/adiado/pendente) diretamente ali, sem ter de ir ao dashboard.
-- Reaproveitar a rota `set_event_status` já existente no dashboard.
+- Para eventos já aceites mostrados no calendário, também poder alterar a data (tal como acontece nos outros estados/ecrãs).
+- Reaproveitar a rota `set_event_status` já existente no dashboard (e a rota de correção de data via PATCH `/api/events/<id>`).
+
+### 12) Crawler privilegiar páginas em português
+- No cron de procura de eventos, quando uma fonte/resultado tiver versão em português e noutra língua, privilegiar sempre a página em português (ex: para extrair descrição, data, imagem).
+
+### 13) Botão "Rejeitar" maior que "Aceitar"
+- Nos cards de evento proposto (dashboard e calendário), o botão "Rejeitar" deve ser visualmente maior que o "Aceitar" (atualmente têm o mesmo tamanho — ver screenshot do utilizador, card "Festa do Jazz").
 
 ## Feito
 - 2026-11-06 — Item 8 (caixa de calendário em todos os campos de data): faltava `onclick="showPicker()"` em 3 inputs (Aceitar no dashboard, data/data fim do formulário manual) — adicionado; o modal do calendário já tinha.
