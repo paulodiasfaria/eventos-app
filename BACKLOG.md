@@ -10,6 +10,10 @@ Lista de melhorias a abordar em sessões futuras. Cada item deve ser movido para
 - Sem decisão tomada ainda — a abordar em sessão dedicada com mockup/feedback iterativo.
 - Relacionado com o item 7 (ecrã de calendário).
 
+### 11) Alterar estado do evento a partir da vista de calendário
+- No modal de detalhe de um dia no `/calendario`, permitir mudar o estado do evento (ex: aceite/rejeitado/adiado/pendente) diretamente ali, sem ter de ir ao dashboard.
+- Reaproveitar a rota `set_event_status` já existente no dashboard.
+
 ## Feito
 - 2026-11-06 — Item 8 (caixa de calendário em todos os campos de data): faltava `onclick="showPicker()"` em 3 inputs (Aceitar no dashboard, data/data fim do formulário manual) — adicionado; o modal do calendário já tinha.
 - 2026-11-06 — Item 9 (evitar duplicados na importação): `/api/events` agora deteta duplicados por título normalizado (sem acentos/pontuação) com similaridade ≥85% + mesma data (tolerância 2 dias) ou mesma cidade quando nenhum dos dois tem data; testado localmente com títulos quase-iguais. Criado `dedupe_events.py` (dry-run por omissão, `--apply` para remover) para limpar duplicados já existentes na BD — mantém o evento com status não-pending, depois o que tem imagem, depois o id mais antigo. Falta o utilizador correr `python dedupe_events.py --apply` na consola do PythonAnywhere para limpar a BD de produção.
