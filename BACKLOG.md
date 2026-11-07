@@ -10,18 +10,8 @@ Lista de melhorias a abordar em sessões futuras. Cada item deve ser movido para
 - Sem decisão tomada ainda — a abordar em sessão dedicada com mockup/feedback iterativo.
 - Relacionado com o item 7 (ecrã de calendário).
 
-### 14) Adicionar evento só por link, preenchido depois pelo cron
-- Além do formulário manual completo, ter uma opção de adicionar um evento só com um URL (ex: página do evento/bilhética).
-- Fica como "pendente de preenchimento" (campos em branco) até o cron diário de procura de eventos correr; nessa run, visita esse link e preenche título/data/local/imagem/etc automaticamente, tal como faz para os eventos que ele próprio encontra.
-
-### 15) Adicionar ícone (favicon) ao site
-- A app não tem favicon — adicionar um ícone simples (ex: SVG/PNG na pasta static, ligado via `<link rel="icon">` no `base.html`) que represente a app (ex: calendário/agenda).
-
-### 16) Renomear rotas para /eventos/lista e /eventos/calendario
-- A app tem de ter as páginas `/eventos/lista` e `/eventos/calendario` em vez de `/eventos` e `/calendario`.
-- Atualizar todos os links internos (nav, redirects de accept/reject/etc.) e confirmar que `/` continua a dar 404 (regra de routing já existente — não expor as rotas reais na raiz).
-
 ## Feito
+- 2026-11-07 — Itens 14-16: (14) nova secção "Adicionar evento só por link" no dashboard (`/events/by-link`) — cria evento com `pending_enrichment=1` e badge "⏳ a preencher pelo cron"; novo endpoint `GET /api/events/pending_links` e `PATCH /api/events/<id>` alargado (category/tags/image_url/price/is_free/pending_enrichment) para o cron preencher os campos e limpar a flag; prompt do cron "Procura de Eventos" tem agora um passo preliminar que processa esta lista antes da procura normal. (15) favicon SVG (ícone de calendário com as cores da app) ligado via `<link rel="icon">` com o mesmo cache-busting do CSS. (16) rotas renomeadas para `/eventos/lista` e `/eventos/calendario` (eram `/eventos` e `/calendario`); `/` continua 404; link da notificação WhatsApp corrigido (apontava para a raiz, que dá 404 de propósito). Testado localmente: rotas antigas dão 404, novas dão 200, fluxo completo add-by-link → pending_links → PATCH → desaparece da lista, favicon serve 200, screenshot do dashboard confirma badge e formulário.
 - 2026-11-06 — Itens 11-13: (11) modal de detalhe de dia no `/calendario` agora tem sempre "Alterar data" + "Mudar estado" para qualquer evento (inclui aceites — nova rota `update_event_date`, atualiza `chosen_date` se aceite ou `event_date` nos restantes); (12) prompt do cron "Procura de Eventos" passou a ter um passo 0 a exigir preferência por páginas em português quando a fonte tem versão noutra língua; (13) botão "Rejeitar" agora maior/mais destacado que "Aceitar" no dashboard e no calendário. Testado localmente (POST às novas rotas + screenshot do dashboard/calendário).
 - 2026-11-06 — Item 8 (caixa de calendário em todos os campos de data): faltava `onclick="showPicker()"` em 3 inputs (Aceitar no dashboard, data/data fim do formulário manual) — adicionado; o modal do calendário já tinha.
 - 2026-11-06 — Item 9 (evitar duplicados na importação): `/api/events` agora deteta duplicados por título normalizado (sem acentos/pontuação) com similaridade ≥85% + mesma data (tolerância 2 dias) ou mesma cidade quando nenhum dos dois tem data; testado localmente com títulos quase-iguais. Criado `dedupe_events.py` (dry-run por omissão, `--apply` para remover) para limpar duplicados já existentes na BD — mantém o evento com status não-pending, depois o que tem imagem, depois o id mais antigo. Falta o utilizador correr `python dedupe_events.py --apply` na consola do PythonAnywhere para limpar a BD de produção.
