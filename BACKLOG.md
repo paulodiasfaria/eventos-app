@@ -17,6 +17,10 @@ Lista de melhorias a abordar em sessões futuras. Cada item deve ser movido para
 ### 15) Adicionar ícone (favicon) ao site
 - A app não tem favicon — adicionar um ícone simples (ex: SVG/PNG na pasta static, ligado via `<link rel="icon">` no `base.html`) que represente a app (ex: calendário/agenda).
 
+### 16) Renomear rotas para /eventos/lista e /eventos/calendario
+- A app tem de ter as páginas `/eventos/lista` e `/eventos/calendario` em vez de `/eventos` e `/calendario`.
+- Atualizar todos os links internos (nav, redirects de accept/reject/etc.) e confirmar que `/` continua a dar 404 (regra de routing já existente — não expor as rotas reais na raiz).
+
 ## Feito
 - 2026-11-06 — Itens 11-13: (11) modal de detalhe de dia no `/calendario` agora tem sempre "Alterar data" + "Mudar estado" para qualquer evento (inclui aceites — nova rota `update_event_date`, atualiza `chosen_date` se aceite ou `event_date` nos restantes); (12) prompt do cron "Procura de Eventos" passou a ter um passo 0 a exigir preferência por páginas em português quando a fonte tem versão noutra língua; (13) botão "Rejeitar" agora maior/mais destacado que "Aceitar" no dashboard e no calendário. Testado localmente (POST às novas rotas + screenshot do dashboard/calendário).
 - 2026-11-06 — Item 8 (caixa de calendário em todos os campos de data): faltava `onclick="showPicker()"` em 3 inputs (Aceitar no dashboard, data/data fim do formulário manual) — adicionado; o modal do calendário já tinha.
