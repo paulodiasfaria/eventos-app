@@ -10,6 +10,11 @@ Lista de melhorias a abordar em sessões futuras. Cada item deve ser movido para
 - Sem decisão tomada ainda — a abordar em sessão dedicada com mockup/feedback iterativo.
 - Relacionado com o item 7 (ecrã de calendário).
 
+### 17) Desduplicação não está a funcionar bem
+- A deteção de duplicados atual (título normalizado ≥85% + mesma data/cidade) continua a deixar passar duplicados reais.
+- Calcular semelhança combinando título, local (venue/cidade) e data — não tratar os critérios isoladamente, mas como um score combinado que pondera os três.
+- Rever também os duplicados já existentes na BD à luz da nova lógica (correr `dedupe_events.py` atualizado).
+
 ## Feito
 - 2026-11-07 — Itens 14-16: (14) nova secção "Adicionar evento só por link" no dashboard (`/events/by-link`) — cria evento com `pending_enrichment=1` e badge "⏳ a preencher pelo cron"; novo endpoint `GET /api/events/pending_links` e `PATCH /api/events/<id>` alargado (category/tags/image_url/price/is_free/pending_enrichment) para o cron preencher os campos e limpar a flag; prompt do cron "Procura de Eventos" tem agora um passo preliminar que processa esta lista antes da procura normal. (15) favicon SVG (ícone de calendário com as cores da app) ligado via `<link rel="icon">` com o mesmo cache-busting do CSS. (16) rotas renomeadas para `/eventos/lista` e `/eventos/calendario` (eram `/eventos` e `/calendario`); `/` continua 404; link da notificação WhatsApp corrigido (apontava para a raiz, que dá 404 de propósito). Testado localmente: rotas antigas dão 404, novas dão 200, fluxo completo add-by-link → pending_links → PATCH → desaparece da lista, favicon serve 200, screenshot do dashboard confirma badge e formulário.
 - 2026-11-06 — Itens 11-13: (11) modal de detalhe de dia no `/calendario` agora tem sempre "Alterar data" + "Mudar estado" para qualquer evento (inclui aceites — nova rota `update_event_date`, atualiza `chosen_date` se aceite ou `event_date` nos restantes); (12) prompt do cron "Procura de Eventos" passou a ter um passo 0 a exigir preferência por páginas em português quando a fonte tem versão noutra língua; (13) botão "Rejeitar" agora maior/mais destacado que "Aceitar" no dashboard e no calendário. Testado localmente (POST às novas rotas + screenshot do dashboard/calendário).
