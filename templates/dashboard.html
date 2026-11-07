@@ -53,6 +53,7 @@
       <div class="event-head">
         <span class="badge badge-{{ e.category }}">{{ e.category }}</span>
         <span class="status-pill">{{ status_labels.get(e.status, e.status) }}</span>
+        {% if e.pending_enrichment %}<span class="status-pill pending-link">⏳ a preencher pelo cron</span>{% endif %}
         {% if e.status == 'pending' %}<span class="score">score {{ "%.1f"|format(e.score) }}</span>{% endif %}
       </div>
       <h3>{{ e.title }}</h3>
@@ -122,6 +123,15 @@
     <input type="url" name="source_url" placeholder="Link">
     <input type="text" name="notes" placeholder="Notas">
     <button type="submit">Adicionar</button>
+  </form>
+</section>
+
+<section class="manual-add">
+  <h2>🔗 Adicionar evento só por link</h2>
+  <p class="hint">Cola só o URL do evento — fica pendente e o cron diário de procura de eventos visita o link e preenche os restantes campos automaticamente.</p>
+  <form method="post" action="{{ url_for('add_event_by_link') }}" class="manual-form">
+    <input type="url" name="link_url" placeholder="https://..." required>
+    <button type="submit">Adicionar por link</button>
   </form>
 </section>
 

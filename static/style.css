@@ -83,6 +83,8 @@ button { cursor: pointer; }
 .manual-form input, .manual-form select { flex: 1 1 150px; }
 .manual-form button { flex: 1 1 100%; background: var(--accent); color: white; border: none; font-weight: 600; padding: 10px; }
 
+.pending-link { background: var(--risk); color: #1a1200; }
+
 .main-nav { display: flex; gap: 16px; margin-top: 8px; }
 .main-nav a { color: var(--muted); text-decoration: none; font-size: 14px; padding: 4px 0; border-bottom: 2px solid transparent; }
 .main-nav a:hover { color: var(--text); border-bottom-color: var(--accent); }

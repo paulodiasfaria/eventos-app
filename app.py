@@ -151,6 +151,7 @@ EXTRA_EVENT_COLUMNS = {
     "is_free": "INTEGER",       # 1 = gratuito, 0 = pago, NULL = desconhecido
     "image_url": "TEXT",        # foto ilustrativa do evento
     "snoozed_until": "TEXT",    # data (YYYY-MM-DD) em que um evento "adiado" volta a pending
+    "pending_enrichment": "INTEGER",  # 1 = evento adicionado só por link, ainda por preencher pelo cron
 }
 
 
@@ -409,7 +410,7 @@ def all_rule_statuses(db):
 # Routes - UI
 # ---------------------------------------------------------------------------
 
-@app.route("/eventos")
+@app.route("/eventos/lista")
 def dashboard():
     db = get_db()
     reactivate_expired_snoozes(db)
@@ -586,7 +587,7 @@ def build_month_grid(month_start, events_by_date):
     }
 
 
-@app.route("/calendario")
+@app.route("/eventos/calendario")
 def calendar_view():
     db = get_db()
     reactivate_expired_snoozes(db)
@@ -681,6 +682,31 @@ def add_manual_event():
     return redirect(url_for("dashboard"))
 
 
+@app.route("/events/by-link", methods=["POST"])
+def add_event_by_link():
+    """Adiciona um evento candidato apenas com um URL — fica 'pendente de
+    preenchimento' (pending_enrichment=1) até o cron diário de procura de
+    eventos visitar o link e preencher os restantes campos via PATCH
+    /api/events/<id>, tal como faz para os eventos que ele próprio encontra."""
+    source_url = (request.form.get("link_url") or "").strip()
+    if not source_url:
+        return redirect(request.referrer or url_for("dashboard"))
+    db = get_db()
+    db.execute(
+        "INSERT INTO events (title, category, source_url, tags, status, "
+        "pending_enrichment, created_at) VALUES (?,?,?,?, 'pending', 1, ?)",
+        (
+            "(a preencher — aguarda o cron)",
+            "other",
+            source_url,
+            json.dumps([]),
+            datetime.utcnow().isoformat(),
+        ),
+    )
+    db.commit()
+    return redirect(url_for("dashboard"))
+
+
 # ---------------------------------------------------------------------------
 # Routes - API (usadas pelo cron do Hermes: alimentar eventos + consultar status)
 # ---------------------------------------------------------------------------
@@ -721,6 +747,22 @@ def api_get_event(event_id):
     return jsonify({c: ev[c] for c in cols})
 
 
+@app.route("/api/events/pending_links", methods=["GET"])
+def api_pending_links():
+    """Lista eventos adicionados só por link (pending_enrichment=1), ainda por
+    preencher — o cron de procura de eventos visita cada source_url e envia os
+    campos encontrados via PATCH /api/events/<id> (incluindo pending_enrichment=0
+    para marcar como feito)."""
+    unauthorized = require_api_key()
+    if unauthorized:
+        return unauthorized
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, source_url, created_at FROM events WHERE pending_enrichment = 1 ORDER BY created_at ASC"
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
 @app.route("/api/events/<int:event_id>", methods=["PATCH"])
 def api_update_event(event_id):
     """Atualiza campos pontuais de um evento existente (ex. corrigir event_date_end
@@ -733,11 +775,20 @@ def api_update_event(event_id):
     if not ev:
         return jsonify({"error": "not_found"}), 404
     payload = request.get_json(force=True) or {}
-    allowed = {"event_date", "event_date_end", "event_time", "notes", "distance_km", "source_url", "title", "chosen_date", "city", "venue", "status"}
+    allowed = {
+        "event_date", "event_date_end", "event_time", "notes", "distance_km",
+        "source_url", "title", "chosen_date", "city", "venue", "status",
+        "category", "tags", "image_url", "price", "is_free", "country", "venue",
+        "pending_enrichment",
+    }
     VALID_STATUSES = {"pending", "accepted", "rejected", "snoozed"}
     updates = {k: v for k, v in payload.items() if k in allowed}
     if "status" in updates and updates["status"] not in VALID_STATUSES:
         return jsonify({"error": "invalid_status", "allowed": sorted(VALID_STATUSES)}), 400
+    if "tags" in updates and isinstance(updates["tags"], list):
+        updates["tags"] = json.dumps(updates["tags"])
+    if "is_free" in updates:
+        updates["is_free"] = 1 if updates["is_free"] else (0 if updates["is_free"] is False else None)
     if not updates:
         return jsonify({"error": "no_valid_fields", "allowed": sorted(allowed)}), 400
     set_clause = ", ".join(f"{k} = ?" for k in updates)
