@@ -811,40 +811,83 @@ def normalize_event_title(title):
 
 
 def _title_similarity(a, b):
+    """Semelhanca de titulo 0..1: maximo entre a comparacao direta (sensivel a
+    pequenas diferencas de grafia) e uma comparacao com as palavras ordenadas
+    alfabeticamente (torna-a robusta a titulos com a mesma informacao mas
+    ordem de palavras diferente, ex: 'Noite de Fado com X' vs 'X - Noite de
+    Fado especial')."""
     import difflib
 
-    return difflib.SequenceMatcher(None, normalize_event_title(a), normalize_event_title(b)).ratio()
+    norm_a = normalize_event_title(a)
+    norm_b = normalize_event_title(b)
+    direct = difflib.SequenceMatcher(None, norm_a, norm_b).ratio()
+    sorted_a = " ".join(sorted(norm_a.split()))
+    sorted_b = " ".join(sorted(norm_b.split()))
+    token_sorted = difflib.SequenceMatcher(None, sorted_a, sorted_b).ratio()
+    return max(direct, token_sorted)
+
+
+def _date_similarity(date_a, date_b):
+    """0..1: 1.0 se igual, decrescendo linearmente até 0 aos 7 dias de distancia.
+    Se faltar uma das datas, devolve um valor neutro (nem penaliza nem beneficia)."""
+    if not date_a or not date_b:
+        return 0.5
+    try:
+        d1 = date.fromisoformat(date_a)
+        d2 = date.fromisoformat(date_b)
+    except ValueError:
+        return 1.0 if date_a == date_b else 0.0
+    diff_days = abs((d1 - d2).days)
+    if diff_days == 0:
+        return 1.0
+    if diff_days >= 7:
+        return 0.0
+    return max(0.0, 1.0 - diff_days / 7)
+
+
+def _location_similarity(item, row):
+    """0..1: compara venue+cidade normalizados (string de texto livre, via difflib)."""
+    import difflib
+
+    loc_a = f"{item.get('venue') or ''} {item.get('city') or ''}"
+    loc_b = f"{row['venue'] or ''} {row['city'] or ''}"
+    norm_a = normalize_event_title(loc_a)
+    norm_b = normalize_event_title(loc_b)
+    if not norm_a and not norm_b:
+        return 0.5  # nenhum dos dois tem local - neutro
+    if not norm_a or not norm_b:
+        return 0.3
+    return difflib.SequenceMatcher(None, norm_a, norm_b).ratio()
 
 
 def find_duplicate_event(db, item, event_date, exclude_id=None):
-    """Deteta duplicados: titulo igual/muito semelhante (>=0.85) e mesma data (ou proxima, <=2 dias),
-    ou titulo igual/semelhante + mesma cidade quando nenhum dos dois tem data. Devolve o id existente
-    ou None."""
+    """Deteta duplicados combinando titulo, local (venue/cidade) e data num score
+    ponderado (title 0.6, local 0.2, data 0.2) - em vez de tratar os tres
+    criterios isoladamente, o que deixava passar duplicados reais (ex: mesmo
+    evento com titulo ligeiramente diferente entre fontes, incluindo ordem de
+    palavras trocada, ou venue escrito de forma distinta). Marca como duplicado
+    quando o score combinado for >= 0.75 E a semelhanca de titulo isolada for
+    >= 0.65 (gate minimo - dois concertos DIFERENTES no mesmo local/data, ex:
+    'Concerto de GNR' vs 'Concerto de Xutos e Pontapes', tem title_sim ~0.60 e
+    nao deve contar como duplicado so por coincidirem local+data). Devolve o id
+    existente ou None."""
     title = item.get("title")
     if not title:
         return None
-    rows = db.execute("SELECT id, title, city, event_date FROM events").fetchall()
+    rows = db.execute("SELECT id, title, city, venue, event_date FROM events").fetchall()
+    best_id, best_score = None, 0.0
     for row in rows:
         if exclude_id is not None and row["id"] == exclude_id:
             continue
-        if _title_similarity(title, row["title"]) < 0.85:
+        title_sim = _title_similarity(title, row["title"])
+        if title_sim < 0.65:
             continue
-        other_date = row["event_date"]
-        if event_date and other_date:
-            try:
-                d1 = date.fromisoformat(event_date)
-                d2 = date.fromisoformat(other_date)
-                if abs((d1 - d2).days) <= 2:
-                    return row["id"]
-            except ValueError:
-                if event_date == other_date:
-                    return row["id"]
-        elif not event_date and not other_date:
-            city_a = (item.get("city") or "").strip().lower()
-            city_b = (row["city"] or "").strip().lower()
-            if city_a == city_b:
-                return row["id"]
-    return None
+        date_sim = _date_similarity(event_date, row["event_date"])
+        loc_sim = _location_similarity(item, row)
+        score = 0.6 * title_sim + 0.2 * loc_sim + 0.2 * date_sim
+        if score >= 0.75 and score > best_score:
+            best_id, best_score = row["id"], score
+    return best_id
 
 
 def should_skip_event(item):

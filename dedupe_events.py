@@ -1,7 +1,9 @@
 """
-Script de limpeza pontual: remove eventos duplicados já existentes na BD
-(título igual ou muito semelhante >=85% + mesma data, com tolerância de 2
-dias, ou mesma cidade quando nenhum dos dois tem data).
+Script de limpeza pontual: remove eventos duplicados já existentes na BD,
+usando a MESMA lógica de deteção de duplicados do app.py (score combinado de
+título + local + data — ver find_duplicate_event em app.py, item 17 do
+backlog). Mantém sempre consistência: se um grupo é duplicado aqui, também
+seria detetado como tal na importação via /api/events.
 
 Mantém o registo "melhor" de cada grupo de duplicados por esta ordem de
 prioridade:
@@ -17,12 +19,17 @@ Uso (local ou na consola Bash do PythonAnywhere, dentro do venv da app):
 Usa o mesmo EVENTOS_DB_PATH que a app usa (ou 'eventos.db' local por
 omissão), para apontar sempre à BD correta.
 """
+import difflib
 import os
 import re
 import sqlite3
 import sys
 import unicodedata
 from datetime import date
+
+TITLE_GATE = 0.65
+DUP_THRESHOLD = 0.75
+W_TITLE, W_LOC, W_DATE = 0.6, 0.2, 0.2
 
 
 def normalize_event_title(title):
@@ -37,28 +44,51 @@ def normalize_event_title(title):
 
 
 def title_similarity(a, b):
-    import difflib
+    norm_a = normalize_event_title(a)
+    norm_b = normalize_event_title(b)
+    direct = difflib.SequenceMatcher(None, norm_a, norm_b).ratio()
+    sorted_a = " ".join(sorted(norm_a.split()))
+    sorted_b = " ".join(sorted(norm_b.split()))
+    token_sorted = difflib.SequenceMatcher(None, sorted_a, sorted_b).ratio()
+    return max(direct, token_sorted)
 
-    return difflib.SequenceMatcher(None, normalize_event_title(a), normalize_event_title(b)).ratio()
 
-
-def dates_close(d1, d2, max_days=2):
-    if not d1 or not d2:
-        return False
+def date_similarity(date_a, date_b):
+    if not date_a or not date_b:
+        return 0.5
     try:
-        return abs((date.fromisoformat(d1) - date.fromisoformat(d2)).days) <= max_days
+        d1 = date.fromisoformat(date_a)
+        d2 = date.fromisoformat(date_b)
     except ValueError:
-        return d1 == d2
+        return 1.0 if date_a == date_b else 0.0
+    diff_days = abs((d1 - d2).days)
+    if diff_days == 0:
+        return 1.0
+    if diff_days >= 7:
+        return 0.0
+    return max(0.0, 1.0 - diff_days / 7)
+
+
+def location_similarity(a, b):
+    loc_a = f"{a.get('venue') or ''} {a.get('city') or ''}"
+    loc_b = f"{b.get('venue') or ''} {b.get('city') or ''}"
+    norm_a = normalize_event_title(loc_a)
+    norm_b = normalize_event_title(loc_b)
+    if not norm_a and not norm_b:
+        return 0.5
+    if not norm_a or not norm_b:
+        return 0.3
+    return difflib.SequenceMatcher(None, norm_a, norm_b).ratio()
 
 
 def is_duplicate(a, b):
-    if title_similarity(a["title"], b["title"]) < 0.85:
+    title_sim = title_similarity(a["title"], b["title"])
+    if title_sim < TITLE_GATE:
         return False
-    if a["event_date"] and b["event_date"]:
-        return dates_close(a["event_date"], b["event_date"])
-    if not a["event_date"] and not b["event_date"]:
-        return (a["city"] or "").strip().lower() == (b["city"] or "").strip().lower()
-    return False
+    date_sim = date_similarity(a["event_date"], b["event_date"])
+    loc_sim = location_similarity(a, b)
+    score = W_TITLE * title_sim + W_LOC * loc_sim + W_DATE * date_sim
+    return score >= DUP_THRESHOLD
 
 
 def rank_key(row):
@@ -94,7 +124,7 @@ def main():
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
-        "SELECT id, title, city, event_date, status, image_url FROM events ORDER BY id"
+        "SELECT id, title, city, venue, event_date, status, image_url FROM events ORDER BY id"
     ).fetchall()
     rows = [dict(r) for r in rows]
 
@@ -108,9 +138,9 @@ def main():
         group_sorted = sorted(group, key=rank_key)
         keep = group_sorted[0]
         remove = group_sorted[1:]
-        print(f"\nGrupo (mantém #{keep['id']} '{keep['title']}' [{keep['event_date']}] [{keep['status']}]):")
+        print(f"\nGrupo (mantém #{keep['id']} '{keep['title']}' [{keep['venue']}, {keep['event_date']}] [{keep['status']}]):")
         for r in remove:
-            print(f"  remove #{r['id']} '{r['title']}' [{r['event_date']}] [{r['status']}]")
+            print(f"  remove #{r['id']} '{r['title']}' [{r['venue']}, {r['event_date']}] [{r['status']}]")
             to_delete.append(r["id"])
 
     print(f"\nTotal de grupos duplicados: {len(groups)} | eventos a remover: {len(to_delete)}")
